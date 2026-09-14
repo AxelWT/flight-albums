@@ -1,0 +1,81 @@
+/* ============================================================
+   Flight Albums — 设计令牌
+   风格参考：lefos.com
+   暖纸底 / 衬线正文 / 等宽标签 / 零圆角 / 虚线分隔
+   ============================================================ */
+
+:root {
+  /* ---------- 字体：全部走系统栈，不下载 webfont ---------- */
+  --fs-font-serif:
+    "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia,
+    "Songti SC", "STSong", "Source Han Serif SC", "Source Han Serif CN",
+    "Noto Serif CJK SC", "Noto Serif SC", SimSun, serif;
+  --fs-font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --fs-font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+
+  /* ---------- 节奏 ---------- */
+  --fs-track-label: 0.2em;
+  --fs-track-mono: 0.12em;
+  --fs-wrap: 60rem;
+  --fs-wrap-narrow: 42rem;
+  --fs-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  --fs-shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.14);
+
+  /* ---------- 色彩：浅色（纸感，默认） ---------- */
+  --fs-bg: #ebe7e4;
+  --fs-bg-soft: #e3e0dd;
+  --fs-surface: #dacbc2;
+  --fs-card-bg: linear-gradient(
+    180deg,
+    var(--fs-surface) 0%,
+    color-mix(in srgb, var(--fs-surface) 85%, var(--fs-bg)) 100%
+  );
+  --fs-ink: #13110f;
+  --fs-ink-2: #5c5650;
+  --fs-ink-3: #6f6a63;
+  --fs-line: rgba(92, 87, 82, 0.5);
+  --fs-line-soft: rgba(92, 87, 82, 0.26);
+  --fs-accent: #252f3d;
+  --fs-accent-hover: #1a2330;
+  --fs-accent-ink: #ebe7e4;
+  --fs-terracotta: #844f3b;
+  --fs-sage: #626245;
+  --fs-sunkissed: #927247;
+  /* 树影与光 */
+  --fs-dapple: #4a3b2a;
+  --fs-light: rgba(255, 249, 238, 0.55);
+  --fs-shade: rgba(66, 54, 42, 0.07);
+
+  /* 虚线：全站用重复渐变画，比 border-style: dashed 更细、间距更好控 */
+  --fs-dash: repeating-linear-gradient(
+    to right,
+    var(--fs-line) 0 5px,
+    transparent 5px 10px
+  );
+}
+
+html.dark {
+  --fs-bg: #161d27;
+  --fs-bg-soft: #1d2733;
+  --fs-surface: #252f3d;
+  --fs-ink: #f0f2f3;
+  --fs-ink-2: #b3ada7;
+  --fs-ink-3: #9a938c;
+  --fs-line: rgba(159, 164, 171, 0.38);
+  --fs-line-soft: rgba(159, 164, 171, 0.2);
+  --fs-accent: #ebe7e4;
+  --fs-accent-hover: #ffffff;
+  --fs-accent-ink: #161d27;
+  --fs-terracotta: #b86b52;
+  --fs-sage: #a3a473;
+  --fs-sunkissed: #e1b06e;
+  --fs-dapple: #cfd9e6;
+  --fs-light: rgba(150, 178, 214, 0.1);
+  --fs-shade: rgba(0, 0, 0, 0.3);
+  --fs-shadow: 0 10px 30px rgba(0, 0, 0, 0.38);
+  --fs-shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.5);
+}

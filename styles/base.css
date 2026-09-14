@@ -1,0 +1,42 @@
+/* ============================================================
+   Flight Albums — 全局基础样式
+   ============================================================ */
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--fs-bg);
+  color: var(--fs-ink);
+  font-family: var(--fs-font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--fs-accent);
+  color: var(--fs-accent-ink);
+}
+
+:focus-visible {
+  outline: 1px solid var(--fs-accent);
+  outline-offset: 2px;
+}
+
+/* 滚动条 */
+@media (min-width: 960px) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--fs-line-soft);
+    border: 3px solid var(--fs-bg);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--fs-line);
+  }
+}
