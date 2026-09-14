@@ -22,8 +22,7 @@ ENV NODE_ENV=production \
 # standalone 输出已自带 server.js + 最小 node_modules
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
-# public 和 start.mjs 直接从构建上下文复制（next build 会清理 /app/public）
-COPY public ./public
+# start.mjs 从构建上下文复制（不在 next build 产物中）
 COPY start.mjs ./start.mjs
 
 RUN addgroup -S app && adduser -S app -G app \
