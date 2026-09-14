@@ -1,0 +1,16 @@
+services:
+  flight-albums:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/flight-albums:latest
+    container_name: flight-albums
+    env_file:
+      - .env
+    environment:
+      - DB_PATH=/app/data/flight-albums.db
+    volumes:
+      - flight-albums_data:/app/data
+    ports:
+      - "8007:3000"
+    restart: unless-stopped
+
+volumes:
+  flight-albums_data:

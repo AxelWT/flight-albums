@@ -13,7 +13,7 @@
 | 图床 | 腾讯云 COS（预签名直传，密钥不出服务器） |
 | 认证 | 单管理员密码 + JWT（jose），httpOnly cookie |
 | 校验 | Zod |
-| 部署 | GitHub Actions → SSH → PM2 |
+| 部署 | GitHub Actions → 阿里云 ACR → Docker Compose |
 
 ## 项目结构
 
@@ -49,9 +49,11 @@ flight-albums/
 │   └── upload.ts                  # 客户端直传工具
 ├── styles/                        # tokens.css / gate.css / base.css
 ├── scripts/init-db.mjs            # 数据库初始化 / 种子
+├── Dockerfile                     # 多阶段构建（standalone → 运行镜像）
+├── docker-compose.prod.yml        # 生产 compose 编排
 ├── start.mjs                      # 生产启动包装器（加载 .env）
-├── ecosystem.config.cjs           # PM2 配置
-└── .github/workflows/deploy.yml   # 部署工作流
+├── ecosystem.config.cjs           # PM2 配置（可选，Docker 部署不使用）
+└── .github/workflows/deploy.yml   # 部署工作流（ACR + Docker Compose）
 ```
 
 ## 本地开发
@@ -85,8 +87,8 @@ cp .env.example .env.local
 | `COS_SECRET_KEY` | 腾讯云 SecretKey | 仅服务端 |
 | `COS_BUCKET` | COS Bucket 名 | 仅服务端 |
 | `COS_REGION` | COS 地域（如 `ap-shanghai`） | 仅服务端 |
-| `NEXT_PUBLIC_COS_PUBLIC_BASE_URL` | COS 公开访问域名 | 前后端 |
 | `DB_PATH` | SQLite 文件路径 | 仅服务端 |
+| `SITE_URL` | 站点公开访问 URL | 仅服务端 |
 
 > COS 密钥只在服务端使用，前端永远拿不到。上传时服务端仅生成限时预签名 URL，图片字节直传 COS，不经服务器。
 
@@ -116,41 +118,51 @@ cp .env.example .env.local
 
 ## 部署
 
-部署通过 GitHub Actions 自动完成：推送到 `main` 分支即触发构建并部署到你的服务器。
+部署通过 GitHub Actions 自动完成：推送到 `main` 分支 → 构建 Docker 镜像 → 推送阿里云 ACR → SSH 到服务器 `docker compose pull && up`。
 
 ### 1. 服务器准备
 
-- Node.js 22+（推荐 24 LTS）
-- PM2（`npm i -g pm2`）
-- 创建部署目录，如 `/var/www/flight-albums`
+- Docker Engine + Docker Compose v2
+- 创建部署目录，如 `/app/flight-albums`
 
-### 2. 配置 GitHub Secrets
+### 2. 阿里云 ACR
+
+在 [阿里云容器镜像服务](https://cr.console.aliyun.com/) 创建个人版/企业版实例，新建命名空间。记录：
+
+- Registry 地址（如 `registry.cn-shanghai.aliyuncs.com`）
+- 命名空间（如 `axello`）
+- 账号密码
+
+### 3. 配置 GitHub Secrets
 
 在仓库 **Settings → Secrets and variables → Actions** 添加：
 
 | Secret | 说明 |
 |---|---|
-| `SSH_HOST` | 服务器 IP |
-| `SSH_USER` | SSH 用户 |
-| `SSH_PRIVATE_KEY` | SSH 私钥（完整内容） |
-| `DEPLOY_PATH` | 部署目录（如 `/var/www/flight-albums`） |
+| `ACR_REGISTRY` | ACR Registry 地址 |
+| `ACR_NAMESPACE` | ACR 命名空间 |
+| `ACR_USERNAME` | ACR 用户名 |
+| `ACR_PASSWORD` | ACR 密码 |
+| `DEPLOY_HOST` | 服务器 IP |
+| `DEPLOY_USER` | SSH 用户 |
+| `DEPLOY_SSH_KEY` | SSH 私钥（完整内容） |
+| `DEPLOY_PORT` | SSH 端口（可选，默认 22） |
+| `DEPLOY_PATH` | 部署目录（如 `/app/flight-albums`） |
 | `ADMIN_PASSWORD` | 管理员密码 |
 | `JWT_SECRET` | JWT 密钥 |
 | `COS_SECRET_ID` / `COS_SECRET_KEY` | 腾讯云密钥 |
 | `COS_BUCKET` / `COS_REGION` | COS 配置 |
-| `NEXT_PUBLIC_COS_PUBLIC_BASE_URL` | COS 公开域名 |
-| `DB_PATH` | 服务器上 SQLite 绝对路径（如 `/var/www/flight-albums/data/flight-albums.db`） |
 | `SITE_URL` | 站点公开 URL |
 
-### 3. 推送部署
+### 4. 推送部署
 
 ```sh
 git push origin main
 ```
 
-工作流会：构建（standalone）→ 生成 `.env` → rsync 到服务器 → PM2 重启。
+工作流会：构建镜像 → 推送 ACR（`latest` + commit 短哈希）→ SSH 拉取最新镜像 → `docker compose up -d`。
 
-### 4. 反向代理（可选）
+### 5. 反向代理（可选）
 
 用 Nginx 反代到 `localhost:3000`：
 

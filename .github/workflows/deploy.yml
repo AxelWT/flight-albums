@@ -6,73 +6,98 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy
+  group: deploy-prod
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build-and-push:
+    name: Build & push to ACR
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Set image tag
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v3
         with:
-          node-version: 22
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/flight-albums:latest
+            ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/flight-albums:${{ steps.meta.outputs.tag }}
 
-      - name: Create .env
+  deploy:
+    name: Deploy to ECS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble .env from secrets
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+          SITE_URL: ${{ secrets.SITE_URL }}
         run: |
-          cat > .env <<'ENVEOF'
-          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          COS_SECRET_ID=${{ secrets.COS_SECRET_ID }}
-          COS_SECRET_KEY=${{ secrets.COS_SECRET_KEY }}
-          COS_BUCKET=${{ secrets.COS_BUCKET }}
-          COS_REGION=${{ secrets.COS_REGION }}
-          NEXT_PUBLIC_COS_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_COS_PUBLIC_BASE_URL }}
-          DB_PATH=${{ secrets.DB_PATH }}
-          SITE_URL=${{ secrets.SITE_URL }}
-          ENVEOF
+          cat > .env <<EOF
+          ADMIN_PASSWORD=$ADMIN_PASSWORD
+          JWT_SECRET=$JWT_SECRET
+          COS_SECRET_ID=$COS_SECRET_ID
+          COS_SECRET_KEY=$COS_SECRET_KEY
+          COS_BUCKET=$COS_BUCKET
+          COS_REGION=$COS_REGION
+          SITE_URL=$SITE_URL
+          EOF
 
-      - name: Build
-        run: npm run build
+      - name: Base64 encode .env for transfer
+        id: env_file
+        run: echo "b64=$(base64 -w 0 .env)" >> $GITHUB_OUTPUT
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Copy compose file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          source: docker-compose.prod.yml
+          target: ${{ secrets.DEPLOY_PATH || '/app/flight-albums' }}
+          overwrite: true
 
-      - name: Sync standalone server
-        run: |
-          rsync -az --delete \
-            .next/standalone/ \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
-
-      - name: Sync static assets & public
-        run: |
-          rsync -az --delete \
-            .next/static/ \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/.next/static/
-          rsync -az --delete \
-            public/ \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/public/
-
-      - name: Upload env & startup files
-        run: |
-          scp .env start.mjs ecosystem.config.cjs \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
-
-      - name: Restart PM2
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd ${{ secrets.DEPLOY_PATH }} && \
-             mkdir -p data && \
-             pm2 delete flight-albums 2>/dev/null; \
-             pm2 start ecosystem.config.cjs && \
-             pm2 save"
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ENV_FILE_B64: ${{ steps.env_file.outputs.b64 }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          envs: ACR_REGISTRY,ACR_NAMESPACE,ACR_USERNAME,ACR_PASSWORD,ENV_FILE_B64
+          script: |
+            set -euo pipefail
+            cd ${{ secrets.DEPLOY_PATH || '/app/flight-albums' }}
+            echo "$ENV_FILE_B64" | base64 -d > .env
+            docker login -u $ACR_USERNAME -p $ACR_PASSWORD $ACR_REGISTRY
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f
