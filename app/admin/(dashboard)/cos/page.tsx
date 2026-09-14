@@ -7,6 +7,8 @@
  * iframe 用 fixed 定位 + 显式 calc 尺寸填满侧边栏右侧的整个视口，
  * 突破 DashboardLayout 的 max-width + padding 容器限制。
  */
+import CosExternalLink from '@/components/admin/CosExternalLink'
+
 export const dynamic = 'force-dynamic'
 
 export default function CosBrowserPage() {
@@ -21,11 +23,14 @@ export default function CosBrowserPage() {
   }
 
   return (
-    <iframe
-      src={url}
-      title="COS Browser"
-      className="fixed top-0 left-56 max-[640px]:left-0 h-screen w-[calc(100vw-14rem)] max-[640px]:w-screen border-0 bg-bg-soft"
-      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
-    />
+    <>
+      <iframe
+        src={url}
+        title="COS Browser"
+        className="fixed top-0 left-56 max-[640px]:left-0 h-screen w-[calc(100vw-14rem)] max-[640px]:w-screen border-0 bg-bg-soft"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
+      />
+      <CosExternalLink url={url} />
+    </>
   )
 }
