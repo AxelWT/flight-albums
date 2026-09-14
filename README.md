@@ -152,6 +152,7 @@ cp .env.example .env.local
 | `JWT_SECRET` | JWT 密钥 |
 | `COS_SECRET_ID` / `COS_SECRET_KEY` | 腾讯云密钥 |
 | `COS_BUCKET` / `COS_REGION` | COS 配置 |
+| `COS_BROWSER_URL` | COS Browser Web 地址（嵌入管理后台 iframe） |
 | `SITE_URL` | 站点公开 URL |
 
 ### 4. 推送部署

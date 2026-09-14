@@ -52,6 +52,7 @@ jobs:
           COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           COS_BUCKET: ${{ secrets.COS_BUCKET }}
           COS_REGION: ${{ secrets.COS_REGION }}
+          COS_BROWSER_URL: ${{ secrets.COS_BROWSER_URL }}
           SITE_URL: ${{ secrets.SITE_URL }}
         run: |
           cat > .env <<EOF
@@ -61,6 +62,7 @@ jobs:
           COS_SECRET_KEY=$COS_SECRET_KEY
           COS_BUCKET=$COS_BUCKET
           COS_REGION=$COS_REGION
+          COS_BROWSER_URL=$COS_BROWSER_URL
           SITE_URL=$SITE_URL
           EOF
 
