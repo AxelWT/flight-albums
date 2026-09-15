@@ -6,7 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle'
  * 门厅首页（/）不使用此布局，保持全屏沉浸感。
  */
 const navLinkClass =
-  'font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3 transition-colors hover:text-ink'
+  'font-mono text-[13px] uppercase tracking-[0.08em] text-ink-3 transition-colors hover:text-ink'
 
 export default function SiteLayout({
   children,
