@@ -8,7 +8,7 @@
  * 素材位于 /public，运行时通过 /shadows-loop-*.mp4|webm 加载，不依赖外部 CDN。
  *
  * 主题切换由 CSS 控制（html.dark 下 .leaf-shadow opacity 更高），本组件不读主题。
- * 阴影开关（ShadowToggle）通过 props.shadowEnabled 决定是否挂载。
+ * props.shadowEnabled 控制是否挂载（首页门厅恒为开启）。
  */
 import { useEffect, useRef } from 'react'
 
