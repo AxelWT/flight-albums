@@ -22,6 +22,8 @@ ENV NODE_ENV=production \
 # standalone 输出已自带 server.js + 最小 node_modules
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
+# public/ 静态资源（视频等）不会被打进 standalone 产物，需单独复制
+COPY --from=build /app/public ./public
 # start.mjs 从构建上下文复制（不在 next build 产物中）
 COPY start.mjs ./start.mjs
 
