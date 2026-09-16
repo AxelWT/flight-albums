@@ -55,6 +55,7 @@ jobs:
           COS_BROWSER_URL: ${{ secrets.COS_BROWSER_URL }}
           SITE_URL: ${{ secrets.SITE_URL }}
           COS_IMAGE_HOST: ${{ vars.COS_IMAGE_HOST }}
+          COS_IMAGE_HOST_SIGNED: ${{ vars.COS_IMAGE_HOST_SIGNED }}
         run: |
           cat > .env <<EOF
           ADMIN_PASSWORD=$ADMIN_PASSWORD
@@ -66,6 +67,7 @@ jobs:
           COS_BROWSER_URL=$COS_BROWSER_URL
           SITE_URL=$SITE_URL
           COS_IMAGE_HOST=$COS_IMAGE_HOST
+          COS_IMAGE_HOST_SIGNED=${COS_IMAGE_HOST_SIGNED:-true}
           EOF
 
       - name: Base64 encode .env for transfer

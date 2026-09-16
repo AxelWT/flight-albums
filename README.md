@@ -87,7 +87,7 @@ cp .env.example .env.local
 | `COS_SECRET_KEY` | 腾讯云 SecretKey | 仅服务端 |
 | `COS_BUCKET` | COS Bucket 名 | 仅服务端 |
 | `COS_REGION` | COS 地域（如 `ap-shanghai`） | 仅服务端 |
-| `COS_IMAGE_HOST` | 图片访问域名（Variable，可选）：腾讯云 COS「自定义 CDN 加速域名」（如 `img-cdn.axello.cn`），配置后图片 URL 走该域名且**不带签名**（CDN 域名不支持 COS 预签名，回源鉴权由 COS 控制台配置域名时的服务授权承担；无签名 URL 缓存 key 稳定，CDN 命中率高）。留空走 COS 源站并带签名 | 仅服务端 |
+| `COS_IMAGE_HOST` | 图片访问域名（Variable，可选）：腾讯云 COS 自定义域名——源站域名（如 `img.axello.cn`，默认**带签名**，私有读可用）或 CDN 加速域名（如 `img-cdn.axello.cn`，必须配 `COS_IMAGE_HOST_SIGNED=false`：CDN 域名不支持预签名，且回源鉴权由 COS 控制台服务授权承担，无签名 URL 缓存 key 稳定命中率高） | 仅服务端 |
 | `DB_PATH` | SQLite 文件路径 | 仅服务端 |
 | `SITE_URL` | 站点公开访问 URL | 仅服务端 |
 
@@ -160,7 +160,8 @@ Variable（非敏感配置，**Settings → Secrets and variables → Actions �
 
 | Variable | 说明 |
 |---|---|
-| `COS_IMAGE_HOST` | 图片访问域名（可选）：腾讯云 COS「自定义 CDN 加速域名」（如 `img-cdn.axello.cn`）。配置后图片 URL 不带签名（CDN 域名不支持预签名，且无签名 URL 才能被 CDN 有效缓存）。留空走 COS 源站带签名 |
+| `COS_IMAGE_HOST` | 图片访问域名（可选）：自定义源站域名（如 `img.axello.cn`，默认带签名）或 CDN 加速域名（如 `img-cdn.axello.cn`，需配 `COS_IMAGE_HOST_SIGNED=false`）。留空走 COS 源站 |
+| `COS_IMAGE_HOST_SIGNED` | 图片域名是否带签名（可选，默认 `true`）。配 CDN 加速域名时设 `false` |
 
 ### 4. 推送部署
 
