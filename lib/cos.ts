@@ -68,8 +68,7 @@ function signRequest(
   method: string,
   urlPath: string,
   queryParams: Record<string, string> = {},
-  expireSeconds = 3600,
-  hostOverride?: string
+  expireSeconds = 3600
 ): string {
   const { secretId, secretKey, host } = getConfig()
 
@@ -81,7 +80,7 @@ function signRequest(
   // 参数按字典序排列
   const paramKeys = Object.keys(queryParams).sort()
   const paramStr = paramKeys.map((k) => `${k}=${queryParams[k]}`).join('&')
-  const headerStr = `host=${hostOverride ?? host}`
+  const headerStr = `host=${host}`
 
   const formatString = `${method}\n${urlPath}\n${paramStr}\n${headerStr}\n`
   const signKey = hmacSha1(secretKey, keyTime)
@@ -116,12 +115,22 @@ export function getSignedGetUrl(
 ): string {
   const { host, imageHost } = getConfig()
   const urlPath = encodePath(key)
-  // 签名 host 必须与实际访问域名一致（COS 按请求的 Host 验签），
-  // 配置了自定义域名（源站 / CDN）时用它签名并拼 URL
-  const signQuery = signRequest('get', urlPath, {}, expireSeconds, imageHost)
-  // 最终 URL：CI 参数 + 签名参数。CI 参数放前面。
+
+  // CDN 加速域名：不带签名。原因有二：
+  // 1. COS 预签名 URL 不适用于 CDN 加速域名（回源时 COS 报 InvalidAccessKeyId），
+  //    CDN 域名回源鉴权由 COS 控制台配置域名时的服务授权承担
+  // 2. 签名含时间戳、每次生成都不同，会让 CDN 缓存完全失效；
+  //    不签名则缓存 key 稳定（路径 + CI 参数），命中率最高
+  if (imageHost) {
+    return ciParams
+      ? `https://${imageHost}${urlPath}?${ciParams}`
+      : `https://${imageHost}${urlPath}`
+  }
+
+  // COS 源站 / 自定义源站域名：签名访问（私有读 Bucket）
+  const signQuery = signRequest('get', urlPath, {}, expireSeconds)
   const query = ciParams ? `${ciParams}&${signQuery}` : signQuery
-  return `https://${imageHost ?? host}${urlPath}?${query}`
+  return `https://${host}${urlPath}?${query}`
 }
 
 /**
