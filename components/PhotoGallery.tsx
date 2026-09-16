@@ -186,12 +186,11 @@ export default function PhotoGallery({ photos, thumbUrls }: Props) {
               {rawUrl && (
                 <a
                   href={rawUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                  download
                   className="inline-flex flex-none items-center gap-1.5 border border-[rgba(240,236,228,0.3)] px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.1em] text-[rgba(240,236,228,0.7)] no-underline transition-[color,border-color] hover:border-[rgba(240,236,228,0.6)] hover:text-[#f0ece4]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  原图 <span aria-hidden="true">↗</span>
+                  下载 <span aria-hidden="true">↓</span>
                 </a>
               )}
             </figcaption>
