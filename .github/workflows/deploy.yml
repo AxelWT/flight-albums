@@ -54,6 +54,7 @@ jobs:
           COS_REGION: ${{ secrets.COS_REGION }}
           COS_BROWSER_URL: ${{ secrets.COS_BROWSER_URL }}
           SITE_URL: ${{ secrets.SITE_URL }}
+          COS_IMAGE_HOST: ${{ vars.COS_IMAGE_HOST }}
         run: |
           cat > .env <<EOF
           ADMIN_PASSWORD=$ADMIN_PASSWORD
@@ -64,6 +65,7 @@ jobs:
           COS_REGION=$COS_REGION
           COS_BROWSER_URL=$COS_BROWSER_URL
           SITE_URL=$SITE_URL
+          COS_IMAGE_HOST=$COS_IMAGE_HOST
           EOF
 
       - name: Base64 encode .env for transfer

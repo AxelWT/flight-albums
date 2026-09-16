@@ -87,6 +87,7 @@ cp .env.example .env.local
 | `COS_SECRET_KEY` | 腾讯云 SecretKey | 仅服务端 |
 | `COS_BUCKET` | COS Bucket 名 | 仅服务端 |
 | `COS_REGION` | COS 地域（如 `ap-shanghai`） | 仅服务端 |
+| `COS_IMAGE_HOST` | 图片访问域名（Variable，可选）：自定义源站或 CDN 加速域名（如 `img-cdn.axello.cn`），留空走 COS 源站 | 仅服务端 |
 | `DB_PATH` | SQLite 文件路径 | 仅服务端 |
 | `SITE_URL` | 站点公开访问 URL | 仅服务端 |
 
@@ -154,6 +155,12 @@ cp .env.example .env.local
 | `COS_BUCKET` / `COS_REGION` | COS 配置 |
 | `COS_BROWSER_URL` | COS Browser Web 地址（嵌入管理后台 iframe） |
 | `SITE_URL` | 站点公开 URL |
+
+Variable（非敏感配置，**Settings → Secrets and variables → Actions → Variables**）：
+
+| Variable | 说明 |
+|---|---|
+| `COS_IMAGE_HOST` | 图片访问域名（可选）：自定义源站域名（如 `img.axello.cn`）或 CDN 加速域名（如 `img-cdn.axello.cn`）。留空走 COS 源站。签名 URL 会自动按该域名计算签名 |
 
 ### 4. 推送部署
 

@@ -22,6 +22,8 @@ interface CosConfig {
   bucket: string
   region: string
   host: string
+  /** 图片访问域名（自定义源站 / CDN 加速域名），未配置时用 COS 源站 */
+  imageHost?: string
 }
 
 function getConfig(): CosConfig {
@@ -34,7 +36,18 @@ function getConfig(): CosConfig {
       '缺少 COS 环境变量（COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET / COS_REGION）'
     )
   }
-  return { secretId, secretKey, bucket, region, host: `${bucket}.cos.${region}.myqcloud.com` }
+  // 去掉协议前缀和末尾斜杠，只保留裸域名（签名和 URL 拼接用）
+  const imageHost = process.env.COS_IMAGE_HOST
+    ?.replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '')
+  return {
+    secretId,
+    secretKey,
+    bucket,
+    region,
+    host: `${bucket}.cos.${region}.myqcloud.com`,
+    imageHost: imageHost || undefined,
+  }
 }
 
 /** 把 key 编码成 URL 路径（保留 / 分隔符） */
@@ -55,7 +68,8 @@ function signRequest(
   method: string,
   urlPath: string,
   queryParams: Record<string, string> = {},
-  expireSeconds = 3600
+  expireSeconds = 3600,
+  hostOverride?: string
 ): string {
   const { secretId, secretKey, host } = getConfig()
 
@@ -67,7 +81,7 @@ function signRequest(
   // 参数按字典序排列
   const paramKeys = Object.keys(queryParams).sort()
   const paramStr = paramKeys.map((k) => `${k}=${queryParams[k]}`).join('&')
-  const headerStr = `host=${host}`
+  const headerStr = `host=${hostOverride ?? host}`
 
   const formatString = `${method}\n${urlPath}\n${paramStr}\n${headerStr}\n`
   const signKey = hmacSha1(secretKey, keyTime)
@@ -100,13 +114,14 @@ export function getSignedGetUrl(
   ciParams?: string,
   expireSeconds = 3600
 ): string {
-  const { host } = getConfig()
+  const { host, imageHost } = getConfig()
   const urlPath = encodePath(key)
-  // 签名时不带 CI 参数（COS 验签时 CI 参数不在 query 列表里）
-  const signQuery = signRequest('get', urlPath, {}, expireSeconds)
+  // 签名 host 必须与实际访问域名一致（COS 按请求的 Host 验签），
+  // 配置了自定义域名（源站 / CDN）时用它签名并拼 URL
+  const signQuery = signRequest('get', urlPath, {}, expireSeconds, imageHost)
   // 最终 URL：CI 参数 + 签名参数。CI 参数放前面。
   const query = ciParams ? `${ciParams}&${signQuery}` : signQuery
-  return `https://${host}${urlPath}?${query}`
+  return `https://${imageHost ?? host}${urlPath}?${query}`
 }
 
 /**
