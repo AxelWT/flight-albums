@@ -89,7 +89,6 @@ cp .env.example .env.local
 | `COS_REGION` | COS 地域（如 `ap-shanghai`） | 仅服务端 |
 | `COS_IMAGE_HOST` | 图片访问域名（Variable，可选）：腾讯云 COS 自定义域名——源站域名（如 `img.axello.cn`，默认**带签名**，私有读可用）或 CDN 加速域名（如 `img-cdn.axello.cn`，必须配 `COS_IMAGE_HOST_SIGNED=false`：CDN 域名不支持预签名，且回源鉴权由 COS 控制台服务授权承担，无签名 URL 缓存 key 稳定命中率高） | 仅服务端 |
 | `DB_PATH` | SQLite 文件路径 | 仅服务端 |
-| `SITE_URL` | 站点公开访问 URL | 仅服务端 |
 
 > COS 密钥只在服务端使用，前端永远拿不到。上传时服务端仅生成限时预签名 URL，图片字节直传 COS，不经服务器。
 
@@ -154,7 +153,6 @@ cp .env.example .env.local
 | `COS_SECRET_ID` / `COS_SECRET_KEY` | 腾讯云密钥 |
 | `COS_BUCKET` / `COS_REGION` | COS 配置 |
 | `COS_BROWSER_URL` | COS Browser Web 地址（嵌入管理后台 iframe） |
-| `SITE_URL` | 站点公开 URL |
 
 Variable（非敏感配置，**Settings → Secrets and variables → Actions → Variables**）：
 
