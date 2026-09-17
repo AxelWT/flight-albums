@@ -52,7 +52,7 @@ export function getDb(): DatabaseSync {
   dbInstance.exec('PRAGMA foreign_keys = ON')
   dbInstance.exec(SCHEMA)
 
-  // 迁移：旧库补充 category 列（默认归入摄影目录）
+  // 迁移：旧库补充 category 列（默认归入拾光目录）
   const cols = dbInstance.prepare('PRAGMA table_info(albums)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'category')) {
     dbInstance.exec("ALTER TABLE albums ADD COLUMN category TEXT NOT NULL DEFAULT 'lens'")

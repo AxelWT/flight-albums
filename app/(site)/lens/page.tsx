@@ -5,8 +5,8 @@ import AlbumList from '@/components/AlbumList'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: '摄影 — Flight Albums',
-  description: '用镜头记录生活中的瞬间',
+  title: '拾光 — Flight Albums',
+  description: '拾起散落的时光与光影',
 }
 
 export default async function LensPage() {
@@ -19,10 +19,10 @@ export default async function LensPage() {
   return (
     <>
       <h1 className="mb-2 font-serif text-[2rem] font-normal leading-tight tracking-[-0.01em] text-ink">
-        摄影
+        拾光
       </h1>
       <blockquote className="my-4 border-l-2 border-line pl-5 font-serif text-[1.02em] italic text-ink-2">
-        用镜头记录生活中的瞬间。
+        光影是散落的时光，一张张拾起来，收进相册里。
       </blockquote>
       <AlbumList albums={albums} counts={counts} />
     </>

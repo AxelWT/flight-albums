@@ -1,8 +1,8 @@
 /**
  * 相册目录（分类）定义
  *
- * 目前固定两个目录：审美（/aesthetic）与摄影（/lens）。
- * NAV_CATEGORIES 决定前台导航顺序（审美在最左）。
+ * 目前固定两个目录：典藏（/aesthetic）与拾光（/lens）。
+ * NAV_CATEGORIES 决定前台导航顺序（典藏在最左）。
  */
 import type { AlbumCategory } from './types'
 
@@ -17,8 +17,8 @@ export const CATEGORY_META: Record<
   AlbumCategory,
   { label: string; path: string }
 > = {
-  aesthetic: { label: '审美', path: '/aesthetic' },
-  lens: { label: '摄影', path: '/lens' },
+  aesthetic: { label: '典藏', path: '/aesthetic' },
+  lens: { label: '拾光', path: '/lens' },
 }
 
 /** 未知值兜底为默认目录 */
