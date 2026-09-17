@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS albums (
   title       TEXT NOT NULL,
   description TEXT,
   coverPath   TEXT NOT NULL,
+  category    TEXT NOT NULL DEFAULT 'lens',
   sortOrder   INTEGER NOT NULL DEFAULT 0,
   createdAt   TEXT NOT NULL,
   updatedAt   TEXT NOT NULL
@@ -53,6 +54,14 @@ CREATE TABLE IF NOT EXISTS photos (
 
 CREATE INDEX IF NOT EXISTS idx_photos_album ON photos(albumId);
 `)
+
+// 迁移：旧库补充 category 列（默认归入摄影目录）
+{
+  const cols = db.prepare('PRAGMA table_info(albums)').all()
+  if (!cols.some((c) => c.name === 'category')) {
+    db.exec("ALTER TABLE albums ADD COLUMN category TEXT NOT NULL DEFAULT 'lens'")
+  }
+}
 
 console.log(`✓ 数据库已初始化：${dbPath}`)
 

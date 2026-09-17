@@ -7,6 +7,7 @@ import {
   getAlbumPhotoPaths,
 } from '@/lib/queries'
 import { deleteObject } from '@/lib/cos'
+import { ALBUM_CATEGORIES } from '@/lib/categories'
 
 interface Ctx {
   params: Promise<{ id: string }>
@@ -16,6 +17,7 @@ const UpdateBody = z.object({
   title: z.string().min(1).max(60).optional(),
   description: z.string().max(300).nullable().optional(),
   coverPath: z.string().min(1).optional(),
+  category: z.enum(ALBUM_CATEGORIES).optional(),
   sortOrder: z.number().int().optional(),
 })
 

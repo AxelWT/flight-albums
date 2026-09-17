@@ -4,7 +4,8 @@
  * 使用 node:sqlite 预编译语句。SQLite 列名用 camelCase，与 TS 类型字段一一对应，无需映射。
  */
 import { getDb } from './db'
-import type { Album, Photo, AlbumInput, PhotoInput } from './types'
+import { normalizeCategory } from './categories'
+import type { Album, Photo, AlbumInput, PhotoInput, AlbumCategory } from './types'
 
 const now = (): string => new Date().toISOString()
 
@@ -21,13 +22,14 @@ function toPlain<T>(row: unknown): T {
    相册
    ============================================================ */
 
-/** 列出全部相册（按 sortOrder 升序） */
-export function listAlbums(): Album[] {
+/** 列出相册（可按目录过滤，按 sortOrder 升序） */
+export function listAlbums(category?: AlbumCategory): Album[] {
   const db = getDb()
-  return db
-    .prepare('SELECT * FROM albums ORDER BY sortOrder ASC, createdAt ASC')
-    .all()
-    .map((r) => toPlain<Album>(r))
+  const sql = category
+    ? 'SELECT * FROM albums WHERE category = ? ORDER BY sortOrder ASC, createdAt ASC'
+    : 'SELECT * FROM albums ORDER BY sortOrder ASC, createdAt ASC'
+  const rows = category ? db.prepare(sql).all(category) : db.prepare(sql).all()
+  return rows.map((r) => toPlain<Album>(r))
 }
 
 /** 取单个相册 */
@@ -42,13 +44,14 @@ export function createAlbum(input: AlbumInput): Album {
   const db = getDb()
   const ts = now()
   db.prepare(
-    `INSERT INTO albums (id, title, description, coverPath, sortOrder, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO albums (id, title, description, coverPath, category, sortOrder, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     input.id,
     input.title,
     input.description ?? null,
     input.coverPath,
+    normalizeCategory(input.category),
     input.sortOrder ?? 0,
     ts,
     ts
@@ -68,12 +71,13 @@ export function updateAlbum(
     title: input.title ?? existing.title,
     description: input.description ?? existing.description,
     coverPath: input.coverPath ?? existing.coverPath,
+    category: input.category ?? existing.category,
     sortOrder: input.sortOrder ?? existing.sortOrder,
   }
   db.prepare(
-    `UPDATE albums SET title = ?, description = ?, coverPath = ?, sortOrder = ?, updatedAt = ?
+    `UPDATE albums SET title = ?, description = ?, coverPath = ?, category = ?, sortOrder = ?, updatedAt = ?
      WHERE id = ?`
-  ).run(merged.title, merged.description, merged.coverPath, merged.sortOrder, now(), id)
+  ).run(merged.title, merged.description, merged.coverPath, merged.category, merged.sortOrder, now(), id)
   return getAlbum(id)
 }
 

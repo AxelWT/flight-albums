@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { listAlbums, listPhotosByAlbum } from '@/lib/queries'
 import { thumb } from '@/lib/imageCdn'
+import { CATEGORY_META, normalizeCategory } from '@/lib/categories'
 import AlbumForm from '@/components/admin/AlbumForm'
 import DeleteButton from '@/components/admin/DeleteButton'
 
@@ -40,7 +41,8 @@ export default function AlbumsAdminPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-serif text-[15px] text-ink">{a.title}</p>
                   <p className="font-mono text-[10px] text-ink-3">
-                    {a.id} · {count} 张 · 排序 {a.sortOrder}
+                    {a.id} · {CATEGORY_META[normalizeCategory(a.category)].label} · {count} 张 ·
+                    排序 {a.sortOrder}
                   </p>
                 </div>
                 <Link

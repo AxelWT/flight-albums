@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
+import { NAV_CATEGORIES, CATEGORY_META } from '@/lib/categories'
 
 /**
  * 站点布局：极简导航 + 页脚，包裹 /lens、/about 等内页。
@@ -25,9 +26,11 @@ export default function SiteLayout({
             Flight Albums
           </Link>
           <nav className="flex items-center gap-5 max-[520px]:gap-4">
-            <Link href="/lens" className={navLinkClass}>
-              摄影
-            </Link>
+            {NAV_CATEGORIES.map((c) => (
+              <Link key={c} href={CATEGORY_META[c].path} className={navLinkClass}>
+                {CATEGORY_META[c].label}
+              </Link>
+            ))}
             <Link href="/about" className={navLinkClass}>
               关于
             </Link>

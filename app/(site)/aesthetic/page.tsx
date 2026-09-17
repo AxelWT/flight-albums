@@ -5,12 +5,12 @@ import AlbumList from '@/components/AlbumList'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: '摄影 — Flight Albums',
-  description: '用镜头记录生活中的瞬间',
+  title: '审美 — Flight Albums',
+  description: '收集分散在各处的美',
 }
 
-export default async function LensPage() {
-  const albums = listAlbums('lens')
+export default async function AestheticPage() {
+  const albums = listAlbums('aesthetic')
   const counts: Record<string, number> = {}
   for (const a of albums) {
     counts[a.id] = listPhotosByAlbum(a.id).length
@@ -19,10 +19,10 @@ export default async function LensPage() {
   return (
     <>
       <h1 className="mb-2 font-serif text-[2rem] font-normal leading-tight tracking-[-0.01em] text-ink">
-        摄影
+        审美
       </h1>
       <blockquote className="my-4 border-l-2 border-line pl-5 font-serif text-[1.02em] italic text-ink-2">
-        用镜头记录生活中的瞬间。
+        美是分散在各处的碎片，收集它们。
       </blockquote>
       <AlbumList albums={albums} counts={counts} />
     </>

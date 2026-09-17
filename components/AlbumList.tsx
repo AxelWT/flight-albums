@@ -8,6 +8,7 @@
 import Link from 'next/link'
 import type { Album } from '@/lib/types'
 import { thumb } from '@/lib/imageCdn'
+import { CATEGORY_META, normalizeCategory } from '@/lib/categories'
 
 interface Props {
   albums: Album[]
@@ -30,7 +31,7 @@ export default function AlbumList({ albums, counts }: Props) {
         {albums.map((album) => (
           <Link
             key={album.id}
-            href={`/lens/${album.id}`}
+            href={`${CATEGORY_META[normalizeCategory(album.category)].path}/${album.id}`}
             className="group flex flex-col overflow-hidden border border-line-soft bg-bg-soft text-ink no-underline transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover"
           >
             <div className="aspect-[16/10] w-full overflow-hidden">

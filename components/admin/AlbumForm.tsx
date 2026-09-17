@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadToCos } from '@/lib/upload'
 import SignedImg from '@/components/SignedImg'
+import { NAV_CATEGORIES, CATEGORY_META, normalizeCategory } from '@/lib/categories'
 import type { Album } from '@/lib/types'
 
 interface Props {
@@ -24,6 +25,7 @@ export default function AlbumForm({ album }: Props) {
   const [title, setTitle] = useState(album?.title ?? '')
   const [description, setDescription] = useState(album?.description ?? '')
   const [coverPath, setCoverPath] = useState(album?.coverPath ?? '')
+  const [category, setCategory] = useState(normalizeCategory(album?.category))
   const [sortOrder, setSortOrder] = useState(album?.sortOrder ?? 0)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -35,7 +37,7 @@ export default function AlbumForm({ album }: Props) {
     setUploading(true)
     setError('')
     try {
-      const key = await uploadToCos(file, 'lens/covers')
+      const key = await uploadToCos(file, `${category}/covers`)
       setCoverPath(key)
     } catch (err) {
       setError(err instanceof Error ? err.message : '封面上传失败')
@@ -56,6 +58,7 @@ export default function AlbumForm({ album }: Props) {
       title: title.trim(),
       description: description.trim() || null,
       coverPath,
+      category,
       sortOrder,
     }
 
@@ -68,6 +71,7 @@ export default function AlbumForm({ album }: Props) {
             title: body.title,
             description: body.description,
             coverPath: body.coverPath,
+            category: body.category,
             sortOrder: body.sortOrder,
           }),
         })
@@ -117,6 +121,21 @@ export default function AlbumForm({ album }: Props) {
           />
         </label>
       )}
+
+      <label className="flex flex-col gap-1.5">
+        <span className={labelClass}>目录</span>
+        <select
+          value={category}
+          onChange={(e) => setCategory(normalizeCategory(e.target.value))}
+          className={fieldClass}
+        >
+          {NAV_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_META[c].label}目录
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="flex flex-col gap-1.5">
         <span className={labelClass}>相册名</span>

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { listAlbums, createAlbum, listPhotosByAlbum } from '@/lib/queries'
+import { ALBUM_CATEGORIES } from '@/lib/categories'
+import type { AlbumCategory } from '@/lib/types'
 
-/** 公开：列出全部相册 + 各相册照片数 */
-export async function GET() {
-  const albums = listAlbums()
+/** 公开：列出相册（可按 ?category= 过滤）+ 各相册照片数 */
+export async function GET(req: NextRequest) {
+  const category = req.nextUrl.searchParams.get('category') as AlbumCategory | null
+  const albums = listAlbums(
+    category && (ALBUM_CATEGORIES as readonly string[]).includes(category) ? category : undefined
+  )
   const counts: Record<string, number> = {}
   for (const a of albums) {
     counts[a.id] = listPhotosByAlbum(a.id).length
@@ -19,6 +24,7 @@ const CreateBody = z.object({
   title: z.string().min(1).max(60),
   description: z.string().max(300).nullable().optional(),
   coverPath: z.string().min(1),
+  category: z.enum(ALBUM_CATEGORIES).optional(),
   sortOrder: z.number().int().optional(),
 })
 

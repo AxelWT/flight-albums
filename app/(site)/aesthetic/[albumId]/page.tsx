@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function AlbumPage({ params }: PageProps) {
+export default async function AestheticAlbumPage({ params }: PageProps) {
   const { albumId } = await params
   return <AlbumDetail albumId={albumId} />
 }

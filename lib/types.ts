@@ -1,10 +1,14 @@
 /** 共享类型定义 */
 
+/** 相册目录（分类） */
+export type AlbumCategory = 'aesthetic' | 'lens'
+
 export interface Album {
   id: string
   title: string
   description: string | null
   coverPath: string
+  category: AlbumCategory
   sortOrder: number
   createdAt: string
   updatedAt: string
@@ -28,6 +32,7 @@ export interface AlbumInput {
   title: string
   description?: string | null
   coverPath: string
+  category?: AlbumCategory
   sortOrder?: number
 }
 

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS albums (
   title       TEXT NOT NULL,
   description TEXT,
   coverPath   TEXT NOT NULL,
+  category    TEXT NOT NULL DEFAULT 'lens',
   sortOrder   INTEGER NOT NULL DEFAULT 0,
   createdAt   TEXT NOT NULL,
   updatedAt   TEXT NOT NULL
@@ -50,6 +51,12 @@ export function getDb(): DatabaseSync {
   dbInstance.exec('PRAGMA journal_mode = WAL')
   dbInstance.exec('PRAGMA foreign_keys = ON')
   dbInstance.exec(SCHEMA)
+
+  // 迁移：旧库补充 category 列（默认归入摄影目录）
+  const cols = dbInstance.prepare('PRAGMA table_info(albums)').all() as { name: string }[]
+  if (!cols.some((c) => c.name === 'category')) {
+    dbInstance.exec("ALTER TABLE albums ADD COLUMN category TEXT NOT NULL DEFAULT 'lens'")
+  }
 
   return dbInstance
 }

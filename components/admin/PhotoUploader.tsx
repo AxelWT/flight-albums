@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadToCos } from '@/lib/upload'
 import { signedUrl } from '@/lib/clientImage'
+import { CATEGORY_META, normalizeCategory } from '@/lib/categories'
 import type { Album } from '@/lib/types'
 
 interface PendingPhoto {
@@ -152,7 +153,7 @@ export default function PhotoUploader({ albums }: { albums: Album[] }) {
           >
             {albums.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.title} ({a.id})
+                {CATEGORY_META[normalizeCategory(a.category)].label} · {a.title} ({a.id})
               </option>
             ))}
           </select>
