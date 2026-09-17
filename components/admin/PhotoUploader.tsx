@@ -46,6 +46,8 @@ export default function PhotoUploader({ albums }: { albums: Album[] }) {
     const arr = Array.from(files).filter((f) => f.type.startsWith('image/'))
     if (!arr.length) return
 
+    const album = albums.find((a) => a.id === albumId)
+    const category = normalizeCategory(album?.category)
     setUploading(true)
     for (const file of arr) {
       const placeholderKey = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -62,7 +64,7 @@ export default function PhotoUploader({ albums }: { albums: Album[] }) {
         },
       ])
       try {
-        const key = await uploadToCos(file, `lens/${albumId}`)
+        const key = await uploadToCos(file, `${category}/${albumId}`)
         // 获取缩略图签名 URL 供预览显示
         const thumbUrl = await signedUrl(key, 'thumb')
         setItems((prev) =>
