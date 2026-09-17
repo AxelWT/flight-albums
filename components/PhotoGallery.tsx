@@ -5,7 +5,7 @@
  *
  *   <PhotoGallery photos={photos} thumbUrls={thumbUrls} />
  *
- * - 缩略图网格：由 Server Component 预先生成签名 URL（thumbUrls），直接渲染
+ * - 缩略图瀑布流：由 Server Component 预先生成签名 URL（thumbUrls），按原始宽高比渲染
  * - Lightbox：点击时按需调 /api/image/sign 获取大图签名 URL，支持 ←/→/Esc 键盘、
  *   点击背景关闭、左右大点击区翻页、右下角"下载原图"
  * - 风格复用设计令牌：纸感卡片、零圆角、虚线分隔
@@ -100,13 +100,14 @@ export default function PhotoGallery({ photos, thumbUrls }: Props) {
 
   return (
     <div className="my-8 font-serif text-ink">
-      {/* 缩略图网格 */}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5 max-[720px]:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] max-[720px]:gap-3">
+      {/* 缩略图瀑布流 —— 按照片原始宽高比展示 */}
+      <div className="columns-[280px] gap-5 max-[720px]:columns-[160px] max-[720px]:gap-3">
         {photos.map((photo, i) => (
           <button
             key={photo.id}
             type="button"
-            className="group flex flex-col overflow-hidden border border-line-soft bg-bg-soft text-left shadow-card transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover"
+            className="group mb-5 flex w-full flex-col overflow-hidden border border-line-soft bg-bg-soft text-left shadow-card transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover max-[720px]:mb-3"
+            style={{ breakInside: 'avoid' }}
             aria-label={`查看 ${photo.title}`}
             onClick={() => setActiveIndex(i)}
           >
@@ -115,7 +116,7 @@ export default function PhotoGallery({ photos, thumbUrls }: Props) {
               alt={photo.title}
               loading="lazy"
               decoding="async"
-              className="aspect-[4/3] w-full object-cover transition-transform duration-400 group-hover:scale-[1.03]"
+              className="block h-auto w-full transition-transform duration-400 group-hover:scale-[1.03]"
             />
             <span className="flex items-baseline justify-between gap-3 border-t border-dashed border-line-soft px-3.5 py-3 max-[720px]:px-3 max-[720px]:py-2.5">
               <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] max-[720px]:text-[13px]">
