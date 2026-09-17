@@ -4,6 +4,7 @@
  *   <AlbumList albums={albums} counts={counts} />
  *
  * 服务端组件：数据由页面查询后传入，点击跳转 /lens/<id>。
+ * 卡片立体效果（叠片 / 阴影 / 错落）见 styles/album-card.css。
  */
 import Link from 'next/link'
 import type { Album } from '@/lib/types'
@@ -26,22 +27,24 @@ export default function AlbumList({ albums, counts }: Props) {
   }
 
   return (
-    <div className="my-8 font-serif text-ink">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-6 max-[520px]:grid-cols-1 max-[520px]:gap-4">
+    <div className="album-grid my-8 font-serif text-ink">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-x-6 gap-y-8 max-[520px]:grid-cols-1 max-[520px]:gap-4">
         {albums.map((album) => (
           <Link
             key={album.id}
             href={`${CATEGORY_META[normalizeCategory(album.category)].path}/${album.id}`}
-            className="group flex flex-col overflow-hidden border border-line-soft bg-bg-soft text-ink no-underline transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover"
+            className="album-card group flex flex-col border border-line-soft bg-bg-soft text-ink no-underline"
           >
-            <div className="aspect-[16/10] w-full overflow-hidden">
-              <img
-                src={thumb(album.coverPath, 600)}
-                alt={album.title}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-              />
+            <div className="album-matte p-3">
+              <div className="aspect-[16/10] w-full overflow-hidden shadow-[0_2px_8px_rgba(19,17,15,0.14)]">
+                <img
+                  src={thumb(album.coverPath, 600)}
+                  alt={album.title}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                />
+              </div>
             </div>
             <div className="border-t border-dashed border-line-soft px-5 pt-[18px] pb-5">
               <div className="flex items-baseline justify-between gap-3">

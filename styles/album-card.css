@@ -1,0 +1,93 @@
+/* ============================================================
+   相册卡片 —— 相纸叠片 + 悬浮层次（AlbumList 专用）
+
+   结构：.album-grid > .album-card
+   - 卡片底下垫两张微旋转的"纸片"（::before/::after），hover 时散开
+   - 双层阴影（近锐影定轮廓 + 远扩散影定高度），hover 抬起并拉长
+   - 封面图衬相纸白边（.album-matte，颜色令牌 --fs-matte）
+   - 偶数位卡片下沉错落，打破均质网格（单列布局取消）
+   ============================================================ */
+
+/* ---------- 错落：偶数位下沉 ---------- */
+.album-grid > .album-card:nth-child(even) {
+  translate: 0 22px;
+}
+
+@media (max-width: 520px) {
+  .album-grid > .album-card:nth-child(even) {
+    translate: none;
+  }
+}
+
+/* ---------- 卡片本体 ---------- */
+.album-card {
+  position: relative;
+  /* 双层阴影：近锐影 + 远扩散 */
+  box-shadow:
+    0 1px 2px rgba(19, 17, 15, 0.1),
+    0 10px 26px rgba(19, 17, 15, 0.1);
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease,
+    translate 0.3s ease;
+}
+
+/* ---------- 底下两张"纸片" ---------- */
+.album-card::before,
+.album-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--fs-line-soft);
+  background: var(--fs-bg-soft);
+  z-index: -1;
+  pointer-events: none;
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+.album-card::before {
+  transform: rotate(1.1deg);
+  box-shadow: 0 3px 10px rgba(19, 17, 15, 0.06);
+}
+
+.album-card::after {
+  transform: rotate(-1.5deg) translateY(3px);
+  box-shadow: 0 6px 16px rgba(19, 17, 15, 0.08);
+}
+
+/* ---------- hover / 键盘聚焦：抬起 + 阴影拉长 + 纸片散开 ---------- */
+.album-card:hover,
+.album-card:focus-visible {
+  transform: translateY(-6px);
+  border-color: var(--fs-line);
+  box-shadow:
+    0 2px 4px rgba(19, 17, 15, 0.1),
+    0 22px 48px rgba(19, 17, 15, 0.16);
+}
+
+.album-card:hover::before,
+.album-card:focus-visible::before {
+  transform: rotate(2.2deg) translate(7px, 5px);
+}
+
+.album-card:hover::after,
+.album-card:focus-visible::after {
+  transform: rotate(-2.6deg) translate(-8px, 8px);
+}
+
+/* ---------- 相纸白边 ---------- */
+.album-matte {
+  background: var(--fs-matte);
+}
+
+/* ---------- 减少动态效果偏好 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .album-card,
+  .album-card::before,
+  .album-card::after {
+    transition: none;
+  }
+}

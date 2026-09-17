@@ -2,6 +2,7 @@
 @import "../styles/tokens.css";
 @import "../styles/base.css";
 @import "../styles/gate.css";
+@import "../styles/album-card.css";
 
 /* 暗色模式：用 html.dark 类切换（与 localStorage 持久化配合），不走 prefers-color-scheme */
 @custom-variant dark (&:where(.dark, .dark *));

@@ -29,6 +29,7 @@
   --fs-bg: #ebe7e4;
   --fs-bg-soft: #e3e0dd;
   --fs-surface: #dacbc2;
+  --fs-matte: #f6f2ec; /* 相纸白边：比卡片底更亮一档 */
   --fs-card-bg: linear-gradient(
     180deg,
     var(--fs-surface) 0%,
@@ -62,6 +63,7 @@ html.dark {
   --fs-bg: #161d27;
   --fs-bg-soft: #1d2733;
   --fs-surface: #252f3d;
+  --fs-matte: #e8e3dc; /* 相纸白边：暗色模式下微降亮度避免刺眼 */
   --fs-ink: #f0f2f3;
   --fs-ink-2: #b3ada7;
   --fs-ink-3: #9a938c;
