@@ -5,6 +5,7 @@
  */
 import { getDb } from './db'
 import { normalizeCategory } from './categories'
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { Album, Photo, AlbumInput, PhotoInput, AlbumCategory } from './types'
 
 const now = (): string => new Date().toISOString()
@@ -19,24 +20,82 @@ function toPlain<T>(row: unknown): T {
 }
 
 /* ============================================================
+   相册密码（scrypt，格式 scrypt$salt$hash，不存明文）
+   ============================================================ */
+
+/** 明文密码 → scrypt 哈希串 */
+export function hashAlbumPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex')
+  const hash = scryptSync(password, salt, 64).toString('hex')
+  return `scrypt$${salt}$${hash}`
+}
+
+/** 校验明文密码是否匹配哈希串 */
+export function verifyAlbumPassword(password: string, stored: string): boolean {
+  const [algo, salt, hash] = stored.split('$')
+  if (algo !== 'scrypt' || !salt || !hash) return false
+  const calc = scryptSync(password, salt, 64)
+  const expected = Buffer.from(hash, 'hex')
+  return calc.length === expected.length && timingSafeEqual(calc, expected)
+}
+
+/* ============================================================
    相册
    ============================================================ */
 
-/** 列出相册（可按目录过滤，按 sortOrder 升序） */
-export function listAlbums(category?: AlbumCategory): Album[] {
-  const db = getDb()
-  const sql = category
-    ? 'SELECT * FROM albums WHERE category = ? ORDER BY sortOrder ASC, createdAt ASC'
-    : 'SELECT * FROM albums ORDER BY sortOrder ASC, createdAt ASC'
-  const rows = category ? db.prepare(sql).all(category) : db.prepare(sql).all()
-  return rows.map((r) => toPlain<Album>(r))
+/** 数据库原始行（albums 表） */
+type AlbumRow = Omit<Album, 'hidden' | 'hasPassword'> & {
+  hidden?: number
+  passwordHash?: string | null
 }
 
-/** 取单个相册 */
+/** 数据库行 → Album（剥除 passwordHash，换算 hidden/hasPassword） */
+function rowToAlbum(row: unknown): Album {
+  const { passwordHash, hidden, ...rest } = row as AlbumRow
+  return {
+    ...rest,
+    hidden: !!hidden,
+    hasPassword: !!passwordHash,
+  }
+}
+
+/**
+ * 列出相册（可按目录过滤，按 sortOrder 升序）。
+ * 默认过滤 hidden（访客视图）；管理后台传 includeHidden = true。
+ */
+export function listAlbums(
+  category?: AlbumCategory,
+  includeHidden = false
+): Album[] {
+  const db = getDb()
+  const where = [
+    category ? 'category = ?' : '',
+    includeHidden ? '' : 'hidden = 0',
+  ]
+    .filter(Boolean)
+    .join(' AND ')
+  const sql = `SELECT * FROM albums${where ? ` WHERE ${where}` : ''} ORDER BY sortOrder ASC, createdAt ASC`
+  const stmt = db.prepare(sql)
+  const rows = category
+    ? stmt.all(category)
+    : stmt.all()
+  return rows.map(rowToAlbum)
+}
+
+/** 取单个相册（不含密码哈希） */
 export function getAlbum(id: string): Album | null {
   const db = getDb()
   const row = db.prepare('SELECT * FROM albums WHERE id = ?').get(id)
-  return row ? toPlain<Album>(row) : null
+  return row ? rowToAlbum(row) : null
+}
+
+/** 取相册密码哈希（仅校验用，不外泄） */
+export function getAlbumPasswordHash(id: string): string | null {
+  const db = getDb()
+  const row = db
+    .prepare('SELECT passwordHash FROM albums WHERE id = ?')
+    .get(id) as { passwordHash: string | null } | undefined
+  return row?.passwordHash ?? null
 }
 
 /** 创建相册 */
@@ -44,8 +103,8 @@ export function createAlbum(input: AlbumInput): Album {
   const db = getDb()
   const ts = now()
   db.prepare(
-    `INSERT INTO albums (id, title, description, coverPath, category, sortOrder, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO albums (id, title, description, coverPath, category, sortOrder, hidden, passwordHash, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     input.id,
     input.title,
@@ -53,13 +112,15 @@ export function createAlbum(input: AlbumInput): Album {
     input.coverPath,
     normalizeCategory(input.category),
     input.sortOrder ?? 0,
+    input.hidden ? 1 : 0,
+    input.password ? hashAlbumPassword(input.password) : null,
     ts,
     ts
   )
   return getAlbum(input.id)!
 }
 
-/** 更新相册（部分字段） */
+/** 更新相册（部分字段；password：字符串=设置，null=清除，undefined=不变） */
 export function updateAlbum(
   id: string,
   input: Partial<Omit<AlbumInput, 'id'>>
@@ -73,11 +134,28 @@ export function updateAlbum(
     coverPath: input.coverPath ?? existing.coverPath,
     category: input.category ?? existing.category,
     sortOrder: input.sortOrder ?? existing.sortOrder,
+    hidden: input.hidden ?? existing.hidden,
+    passwordHash:
+      input.password === undefined
+        ? (getAlbumPasswordHash(id) ?? null)
+        : input.password === null
+          ? null
+          : hashAlbumPassword(input.password),
   }
   db.prepare(
-    `UPDATE albums SET title = ?, description = ?, coverPath = ?, category = ?, sortOrder = ?, updatedAt = ?
+    `UPDATE albums SET title = ?, description = ?, coverPath = ?, category = ?, sortOrder = ?, hidden = ?, passwordHash = ?, updatedAt = ?
      WHERE id = ?`
-  ).run(merged.title, merged.description, merged.coverPath, merged.category, merged.sortOrder, now(), id)
+  ).run(
+    merged.title,
+    merged.description,
+    merged.coverPath,
+    merged.category,
+    merged.sortOrder,
+    merged.hidden ? 1 : 0,
+    merged.passwordHash,
+    now(),
+    id
+  )
   return getAlbum(id)
 }
 

@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { listAlbums, createAlbum, listPhotosByAlbum } from '@/lib/queries'
 import { ALBUM_CATEGORIES } from '@/lib/categories'
+import { isAdmin } from '@/lib/albumAccess'
 import type { AlbumCategory } from '@/lib/types'
 
-/** 公开：列出相册（可按 ?category= 过滤）+ 各相册照片数 */
+/** 公开：列出相册（可按 ?category= 过滤）+ 各相册照片数；隐藏相册仅管理员可见 */
 export async function GET(req: NextRequest) {
   const category = req.nextUrl.searchParams.get('category') as AlbumCategory | null
+  const admin = await isAdmin()
   const albums = listAlbums(
-    category && (ALBUM_CATEGORIES as readonly string[]).includes(category) ? category : undefined
+    category && (ALBUM_CATEGORIES as readonly string[]).includes(category) ? category : undefined,
+    admin
   )
   const counts: Record<string, number> = {}
   for (const a of albums) {
@@ -26,6 +29,8 @@ const CreateBody = z.object({
   coverPath: z.string().min(1),
   category: z.enum(ALBUM_CATEGORIES).optional(),
   sortOrder: z.number().int().optional(),
+  hidden: z.boolean().optional(),
+  password: z.string().min(1).max(64).nullable().optional(),
 })
 
 /** 管理员：创建相册 */

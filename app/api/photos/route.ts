@@ -1,11 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { listPhotosByAlbum, listAllPhotos, createPhoto } from '@/lib/queries'
+import {
+  listPhotosByAlbum,
+  listAllPhotos,
+  createPhoto,
+  listAlbums,
+} from '@/lib/queries'
+import { getAlbumAccess, isAdmin, getUnlockedAlbumIds } from '@/lib/albumAccess'
 
-/** 公开：按相册列出照片（?album=xxx），不带 album 则列出全部（管理用） */
+/** 公开：按相册列出照片（?album=xxx）；隐藏/未解锁相册对访客拦截。不带 album 则列出全部（管理用）。 */
 export async function GET(req: NextRequest) {
   const album = req.nextUrl.searchParams.get('album')
-  const photos = album ? listPhotosByAlbum(album) : listAllPhotos()
+  if (album) {
+    const access = await getAlbumAccess(album)
+    if (access.status === 'not-found' || access.status === 'hidden') {
+      return NextResponse.json({ photos: [] })
+    }
+    if (access.status === 'locked') {
+      return NextResponse.json({ error: '相册已加密' }, { status: 403 })
+    }
+    return NextResponse.json({ photos: listPhotosByAlbum(album) })
+  }
+
+  const photos = listAllPhotos()
+  // 全量列表：访客过滤隐藏 / 未解锁相册的照片
+  if (!(await isAdmin())) {
+    const unlocked = new Set(await getUnlockedAlbumIds())
+    const blocked = new Set(
+      listAlbums(undefined, true)
+        .filter((a) => a.hidden || (a.hasPassword && !unlocked.has(a.id)))
+        .map((a) => a.id)
+    )
+    return NextResponse.json({
+      photos: photos.filter((p) => !blocked.has(p.albumId)),
+    })
+  }
   return NextResponse.json({ photos })
 }
 

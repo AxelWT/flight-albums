@@ -12,6 +12,8 @@ import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 
 const PUBLIC_ADMIN = ['/admin/login']
 const PUBLIC_API = ['/api/auth/login', '/api/auth/logout']
+/** 相册解锁：POST 但需要对访客开放（动态段） */
+const UNLOCK_API_RE = /^\/api\/albums\/[^/]+\/unlock$/
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -31,7 +33,7 @@ export async function middleware(req: NextRequest) {
 
   // API 保护
   if (pathname.startsWith('/api')) {
-    const isPublicApi = PUBLIC_API.includes(pathname)
+    const isPublicApi = PUBLIC_API.includes(pathname) || UNLOCK_API_RE.test(pathname)
     const isPublicGet = req.method === 'GET' && !pathname.startsWith('/api/upload')
     if (!isPublicApi && !isPublicGet && !ok) {
       return NextResponse.json({ error: '未授权' }, { status: 401 })

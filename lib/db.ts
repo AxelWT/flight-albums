@@ -14,14 +14,16 @@ let dbInstance: DatabaseSync | null = null
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS albums (
-  id          TEXT PRIMARY KEY,
-  title       TEXT NOT NULL,
-  description TEXT,
-  coverPath   TEXT NOT NULL,
-  category    TEXT NOT NULL DEFAULT 'lens',
-  sortOrder   INTEGER NOT NULL DEFAULT 0,
-  createdAt   TEXT NOT NULL,
-  updatedAt   TEXT NOT NULL
+  id           TEXT PRIMARY KEY,
+  title        TEXT NOT NULL,
+  description  TEXT,
+  coverPath    TEXT NOT NULL,
+  category     TEXT NOT NULL DEFAULT 'lens',
+  sortOrder    INTEGER NOT NULL DEFAULT 0,
+  hidden       INTEGER NOT NULL DEFAULT 0,
+  passwordHash TEXT,
+  createdAt    TEXT NOT NULL,
+  updatedAt    TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS photos (
@@ -56,6 +58,13 @@ export function getDb(): DatabaseSync {
   const cols = dbInstance.prepare('PRAGMA table_info(albums)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'category')) {
     dbInstance.exec("ALTER TABLE albums ADD COLUMN category TEXT NOT NULL DEFAULT 'lens'")
+  }
+  // 迁移：旧库补充 hidden / passwordHash 列（相册隐藏与密码保护）
+  if (!cols.some((c) => c.name === 'hidden')) {
+    dbInstance.exec('ALTER TABLE albums ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!cols.some((c) => c.name === 'passwordHash')) {
+    dbInstance.exec('ALTER TABLE albums ADD COLUMN passwordHash TEXT')
   }
 
   return dbInstance

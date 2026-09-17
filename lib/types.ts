@@ -10,6 +10,10 @@ export interface Album {
   coverPath: string
   category: AlbumCategory
   sortOrder: number
+  /** 访客不可见（管理员登录后可见） */
+  hidden: boolean
+  /** 已设置访问密码（密码哈希不出库、不进 API 响应） */
+  hasPassword: boolean
   createdAt: string
   updatedAt: string
 }
@@ -34,6 +38,13 @@ export interface AlbumInput {
   coverPath: string
   category?: AlbumCategory
   sortOrder?: number
+  /** 是否对访客隐藏 */
+  hidden?: boolean
+  /**
+   * 访问密码：字符串 = 设置/修改，null = 清除，undefined = 不变（更新时）。
+   * 传入的是明文，由 queries 层做 scrypt 哈希后入库。
+   */
+  password?: string | null
 }
 
 /** 创建/更新照片的输入 */

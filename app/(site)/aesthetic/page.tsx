@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { listAlbums, listPhotosByAlbum } from '@/lib/queries'
+import { isAdmin } from '@/lib/albumAccess'
 import AlbumList from '@/components/AlbumList'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 }
 
 export default async function AestheticPage() {
-  const albums = listAlbums('aesthetic')
+  const albums = listAlbums('aesthetic', await isAdmin())
   const counts: Record<string, number> = {}
   for (const a of albums) {
     counts[a.id] = listPhotosByAlbum(a.id).length

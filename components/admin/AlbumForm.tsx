@@ -27,6 +27,9 @@ export default function AlbumForm({ album }: Props) {
   const [coverPath, setCoverPath] = useState(album?.coverPath ?? '')
   const [category, setCategory] = useState(normalizeCategory(album?.category))
   const [sortOrder, setSortOrder] = useState(album?.sortOrder ?? 0)
+  const [hidden, setHidden] = useState(album?.hidden ?? false)
+  const [password, setPassword] = useState('')
+  const [clearPassword, setClearPassword] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -53,6 +56,13 @@ export default function AlbumForm({ album }: Props) {
     if (!coverPath) return setError('请上传封面图片')
     setSaving(true)
 
+    const pw = password.trim()
+    const passwordField = isEdit
+      ? clearPassword
+        ? null // 清除密码
+        : pw || undefined // 留空 = 不变
+      : pw || null // 创建：留空 = 不设密码
+
     const body = {
       id: id.trim(),
       title: title.trim(),
@@ -60,6 +70,8 @@ export default function AlbumForm({ album }: Props) {
       coverPath,
       category,
       sortOrder,
+      hidden,
+      password: passwordField,
     }
 
     try {
@@ -73,6 +85,8 @@ export default function AlbumForm({ album }: Props) {
             coverPath: body.coverPath,
             category: body.category,
             sortOrder: body.sortOrder,
+            hidden: body.hidden,
+            password: body.password,
           }),
         })
         if (!res.ok) {
@@ -167,6 +181,50 @@ export default function AlbumForm({ album }: Props) {
           className={fieldClass}
         />
       </label>
+
+      <label className="flex items-center gap-2.5">
+        <input
+          type="checkbox"
+          checked={hidden}
+          onChange={(e) => setHidden(e.target.checked)}
+          className="h-4 w-4 accent-[var(--fs-accent)]"
+        />
+        <span className="font-sans text-sm text-ink">
+          隐藏相册
+          <span className="ml-1.5 font-mono text-[11px] text-ink-3">
+            （访客不可见，登录管理员可见）
+          </span>
+        </span>
+      </label>
+
+      <div className="flex flex-col gap-1.5">
+        <span className={labelClass}>
+          访问密码（可选，{isEdit && album?.hasPassword ? '已设置' : '访客需输入密码才能浏览'}）
+        </span>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={clearPassword}
+          placeholder={
+            isEdit && album?.hasPassword
+              ? '留空保持不变'
+              : '不设密码则公开浏览'
+          }
+          className={`${fieldClass} disabled:opacity-50`}
+        />
+        {isEdit && album?.hasPassword && (
+          <label className="mt-0.5 flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={clearPassword}
+              onChange={(e) => setClearPassword(e.target.checked)}
+              className="h-3.5 w-3.5 accent-[var(--fs-accent)]"
+            />
+            <span className="font-mono text-[11px] text-ink-3">清除密码</span>
+          </label>
+        )}
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <span className={labelClass}>封面图片</span>

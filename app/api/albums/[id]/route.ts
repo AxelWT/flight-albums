@@ -19,6 +19,9 @@ const UpdateBody = z.object({
   coverPath: z.string().min(1).optional(),
   category: z.enum(ALBUM_CATEGORIES).optional(),
   sortOrder: z.number().int().optional(),
+  hidden: z.boolean().optional(),
+  /** 密码：字符串=设置，null=清除，缺省=不变 */
+  password: z.string().min(1).max(64).nullable().optional(),
 })
 
 /** 管理员：更新相册 */

@@ -8,7 +8,7 @@ import DeleteButton from '@/components/admin/DeleteButton'
 export const dynamic = 'force-dynamic'
 
 export default function AlbumsAdminPage() {
-  const albums = listAlbums()
+  const albums = listAlbums(undefined, true)
 
   return (
     <>
@@ -43,6 +43,8 @@ export default function AlbumsAdminPage() {
                   <p className="font-mono text-[10px] text-ink-3">
                     {a.id} · {CATEGORY_META[normalizeCategory(a.category)].label} · {count} 张 ·
                     排序 {a.sortOrder}
+                    {a.hasPassword && <span className="text-sunkissed"> · 密码</span>}
+                    {a.hidden && <span className="text-terracotta"> · 隐藏</span>}
                   </p>
                 </div>
                 <Link

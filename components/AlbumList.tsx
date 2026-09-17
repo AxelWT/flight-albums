@@ -51,8 +51,10 @@ export default function AlbumList({ albums, counts }: Props) {
                 <h3 className="m-0 font-serif text-[19px] font-normal text-ink">
                   {album.title}
                 </h3>
-                <span className="flex-none font-mono text-[10.5px] uppercase tracking-[0.1em] text-ink-3">
-                  {counts[album.id] ?? 0} 张
+                <span className="flex flex-none items-baseline gap-2 font-mono text-[10.5px] uppercase tracking-[0.1em] text-ink-3">
+                  {album.hasPassword && <span title="需要密码">密码</span>}
+                  {album.hidden && <span title="已隐藏">隐藏</span>}
+                  <span>{counts[album.id] ?? 0} 张</span>
                 </span>
               </div>
               {album.description && (

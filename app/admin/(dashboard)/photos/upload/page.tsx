@@ -5,7 +5,7 @@ import PhotoUploader from '@/components/admin/PhotoUploader'
 export const dynamic = 'force-dynamic'
 
 export default function UploadPage() {
-  const albums = listAlbums()
+  const albums = listAlbums(undefined, true)
 
   return (
     <>

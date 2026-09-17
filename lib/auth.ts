@@ -48,4 +48,36 @@ export function verifyPassword(input: string): boolean {
   return diff === 0
 }
 
-export { COOKIE_NAME }
+/* ============================================================
+   相册解锁 token（访客输入相册密码成功后签发）
+   ============================================================ */
+
+const UNLOCK_COOKIE_NAME = 'fa_unlocks'
+const UNLOCK_TTL = '30d'
+
+/** 签发解锁 token（payload 为已解锁相册 id 列表） */
+export async function signUnlockToken(albumIds: string[]): Promise<string> {
+  return new SignJWT({ albums: albumIds })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(UNLOCK_TTL)
+    .sign(getSecret())
+}
+
+/** 校验解锁 token，返回已解锁相册 id 列表（无效返回空数组） */
+export async function verifyUnlockToken(
+  token: string | undefined | null
+): Promise<string[]> {
+  if (!token) return []
+  try {
+    const { payload } = await jwtVerify(token, getSecret())
+    const albums = payload.albums
+    return Array.isArray(albums)
+      ? albums.filter((a): a is string => typeof a === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+export { COOKIE_NAME, UNLOCK_COOKIE_NAME }

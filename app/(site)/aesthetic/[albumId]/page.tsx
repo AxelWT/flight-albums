@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { getAlbum } from '@/lib/queries'
+import { getAlbumAccess } from '@/lib/albumAccess'
 import AlbumDetail from '@/components/AlbumDetail'
 
 export const dynamic = 'force-dynamic'
@@ -10,11 +10,15 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { albumId } = await params
-  const album = getAlbum(albumId)
-  if (!album) return { title: '相册不存在 — Flight Albums' }
+  const access = await getAlbumAccess(albumId)
+  if (access.status === 'not-found' || access.status === 'hidden') {
+    return { title: '相册不存在 — Flight Albums' }
+  }
+  // 锁定状态只暴露标题，不泄露简介
   return {
-    title: `${album.title} — Flight Albums`,
-    description: album.description ?? undefined,
+    title: `${access.album.title} — Flight Albums`,
+    description:
+      access.status === 'ok' ? (access.album.description ?? undefined) : undefined,
   }
 }
 

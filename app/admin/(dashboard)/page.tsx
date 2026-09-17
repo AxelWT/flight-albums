@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export default function DashboardPage() {
   const { albumCount, photoCount, recentPhotos } = getStats()
-  const albums = listAlbums()
+  const albums = listAlbums(undefined, true)
   const albumMap = new Map(albums.map((a) => [a.id, a.title]))
 
   return (
