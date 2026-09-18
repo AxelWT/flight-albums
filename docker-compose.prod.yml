@@ -6,6 +6,8 @@ services:
       - .env
     environment:
       - DB_PATH=/app/data/flight-albums.db
+      # 访问统计的每日聚合按本地时区切日，必须固定时区
+      - TZ=Asia/Shanghai
     volumes:
       - flight-albums_data:/app/data
     ports:

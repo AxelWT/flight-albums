@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { getAlbumAccess } from '@/lib/albumAccess'
+import { trackVisit } from '@/lib/trackVisit'
 import AlbumDetail from '@/components/AlbumDetail'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function AlbumPage({ params }: PageProps) {
+export default async function LensAlbumPage({ params }: PageProps) {
   const { albumId } = await params
+  // 仅在可正常浏览时计数（锁定/隐藏的尝试访问不进统计，避免刷密码请求污染数据）
+  const access = await getAlbumAccess(albumId)
+  if (access.status === 'ok') {
+    await trackVisit(`/lens/${albumId}`, albumId)
+  }
   return <AlbumDetail albumId={albumId} />
 }

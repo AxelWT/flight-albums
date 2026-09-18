@@ -20,6 +20,8 @@ module.exports = {
         NODE_ENV: 'production',
         HOSTNAME: '0.0.0.0',
         PORT: 3000,
+        // 访问统计的每日聚合按本地时区切日，必须固定时区
+        TZ: 'Asia/Shanghai',
       },
     },
   ],

@@ -280,3 +280,171 @@ export function getStats(): { albumCount: number; photoCount: number; recentPhot
     .map((r) => toPlain<Photo>(r))
   return { albumCount, photoCount, recentPhotos }
 }
+
+/* ============================================================
+   访问统计
+   ============================================================ */
+
+/** 访问记录 */
+export interface VisitRow {
+  id: number
+  path: string
+  albumId: string | null
+  ip: string
+  userAgent: string | null
+  referer: string | null
+  createdAt: string
+}
+
+/** 每日聚合行 */
+export interface DailyVisit {
+  day: string
+  pv: number
+  uv: number
+}
+
+const VISIT_RETENTION_DAYS = 180
+
+/** 写入一条访问记录，并顺带清理超过保留期的旧记录 */
+export function recordVisit(input: {
+  path: string
+  albumId?: string | null
+  ip?: string
+  userAgent?: string | null
+  referer?: string | null
+}): void {
+  const db = getDb()
+  db.prepare(
+    `INSERT INTO visits (path, albumId, ip, userAgent, referer, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    input.path,
+    input.albumId ?? null,
+    input.ip || 'unknown',
+    input.userAgent ?? null,
+    input.referer ?? null,
+    now()
+  )
+  db.prepare(
+    `DELETE FROM visits WHERE createdAt < ?`
+  ).run(new Date(Date.now() - VISIT_RETENTION_DAYS * 86400_000).toISOString())
+}
+
+/** 统计区间起始 ISO 时间；range = 0 表示全部 */
+function rangeStart(range: number): string | null {
+  if (!range) return null
+  return new Date(Date.now() - range * 86400_000).toISOString()
+}
+
+/** 区间 PV / UV（按 IP 去重）+ 每日序列（含空日补零） */
+export function getVisitStats(range: number): {
+  pv: number
+  uv: number
+  daily: DailyVisit[]
+} {
+  const db = getDb()
+  const since = rangeStart(range)
+  const where = since ? 'WHERE createdAt >= ?' : ''
+  const args = since ? [since] : []
+
+  const total = db
+    .prepare(
+      `SELECT COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv FROM visits ${where}`
+    )
+    .get(...args) as { pv: number; uv: number }
+
+  // 每日序列：SQL 按天聚合（服务器本地时区日期），再在前端范围补零
+  const rows = (
+    db
+      .prepare(
+        `SELECT substr(datetime(createdAt, 'localtime'), 1, 10) AS day, COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv
+         FROM visits ${where}
+         GROUP BY day ORDER BY day ASC`
+      )
+      .all(...args) as unknown
+  ) as DailyVisit[]
+
+  return { pv: total.pv, uv: total.uv, daily: rows }
+}
+
+/** 今日（服务器本地时区）PV / UV */
+export function getTodayStats(): { pv: number; uv: number } {
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv
+       FROM visits WHERE date(createdAt, 'localtime') = date('now', 'localtime')`
+    )
+    .get() as { pv: number; uv: number }
+  return row
+}
+
+/** 区间 Top 路径（含 PV） */
+export function getTopPaths(range: number, limit = 10): { path: string; pv: number }[] {
+  const db = getDb()
+  const since = rangeStart(range)
+  const rows = db
+    .prepare(
+      `SELECT path, COUNT(*) AS pv FROM visits ${since ? 'WHERE createdAt >= ?' : ''}
+       GROUP BY path ORDER BY pv DESC, path ASC LIMIT ?`
+    )
+    .all(...(since ? [since, limit] : [limit])) as { path: string; pv: number }[]
+  return rows
+}
+
+/** 区间 Top 相册（按 albumId 聚合，相册可能已删除，标题由调用方映射） */
+export function getTopAlbums(
+  range: number,
+  limit = 10
+): { albumId: string; pv: number; lastVisitAt: string }[] {
+  const db = getDb()
+  const since = rangeStart(range)
+  const where = [
+    since ? 'createdAt >= ?' : '',
+    'albumId IS NOT NULL',
+  ]
+    .filter(Boolean)
+    .join(' AND ')
+  const rows = db
+    .prepare(
+      `SELECT albumId, COUNT(*) AS pv, MAX(createdAt) AS lastVisitAt
+       FROM visits WHERE ${where}
+       GROUP BY albumId ORDER BY pv DESC LIMIT ?`
+    )
+    .all(...(since ? [since, limit] : [limit])) as {
+    albumId: string
+    pv: number
+    lastVisitAt: string
+  }[]
+  return rows
+}
+
+/** 区间 Top IP（次数 + 最近访问时间） */
+export function getTopIps(
+  range: number,
+  limit = 10
+): { ip: string; pv: number; lastVisitAt: string }[] {
+  const db = getDb()
+  const since = rangeStart(range)
+  const rows = db
+    .prepare(
+      `SELECT ip, COUNT(*) AS pv, MAX(createdAt) AS lastVisitAt
+       FROM visits ${since ? 'WHERE createdAt >= ?' : ''}
+       GROUP BY ip ORDER BY pv DESC, ip ASC LIMIT ?`
+    )
+    .all(...(since ? [since, limit] : [limit])) as {
+    ip: string
+    pv: number
+    lastVisitAt: string
+  }[]
+  return rows
+}
+
+/** 最近访问明细 */
+export function getRecentVisits(limit = 50): VisitRow[] {
+  const db = getDb()
+  return db
+    .prepare('SELECT * FROM visits ORDER BY createdAt DESC LIMIT ?')
+    .all(limit)
+    .map((r) => toPlain<VisitRow>(r))
+}

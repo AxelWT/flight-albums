@@ -13,6 +13,7 @@ const NAV = [
   { href: '/admin/albums', label: '相册' },
   { href: '/admin/photos/upload', label: '上传照片' },
   { href: '/admin/cos', label: 'COS 文件' },
+  { href: '/admin/analytics', label: '访问统计' },
 ]
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {

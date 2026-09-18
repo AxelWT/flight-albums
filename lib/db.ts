@@ -40,6 +40,20 @@ CREATE TABLE IF NOT EXISTS photos (
 );
 
 CREATE INDEX IF NOT EXISTS idx_photos_album ON photos(albumId);
+
+CREATE TABLE IF NOT EXISTS visits (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  path      TEXT NOT NULL,
+  albumId   TEXT,
+  ip        TEXT NOT NULL DEFAULT 'unknown',
+  userAgent TEXT,
+  referer   TEXT,
+  createdAt TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_visits_created ON visits(createdAt);
+CREATE INDEX IF NOT EXISTS idx_visits_path ON visits(path);
+CREATE INDEX IF NOT EXISTS idx_visits_ip ON visits(ip);
 `
 
 export function getDb(): DatabaseSync {

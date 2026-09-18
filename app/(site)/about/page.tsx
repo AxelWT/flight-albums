@@ -1,5 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { trackVisit } from '@/lib/trackVisit'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: '关于 — Flight Albums',
@@ -9,7 +12,8 @@ export const metadata: Metadata = {
 const sectionLabel =
   'font-mono text-[15px] uppercase tracking-[0.14em] text-ink-3'
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  await trackVisit('/about')
   return (
     <>
       {/* 头部：头像 + 名字 + 标语 */}
