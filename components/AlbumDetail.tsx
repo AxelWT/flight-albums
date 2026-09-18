@@ -6,7 +6,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { listPhotosByAlbum } from '@/lib/queries'
-import { thumb } from '@/lib/imageCdn'
+import { thumbSrcset } from '@/lib/imageCdn'
 import { getAlbumAccess } from '@/lib/albumAccess'
 import { CATEGORY_META, normalizeCategory } from '@/lib/categories'
 import PhotoGallery from '@/components/PhotoGallery'
@@ -40,10 +40,10 @@ export default async function AlbumDetail({ albumId }: { albumId: string }) {
 
   const photos = listPhotosByAlbum(albumId)
 
-  // 服务端预生成缩略图签名 URL，传给客户端 PhotoGallery
-  const thumbUrls: Record<string, string> = {}
+  // 服务端预生成响应式缩略图签名 URL（240/400/640w），传给客户端 PhotoGallery
+  const thumbs: Record<string, { src: string; srcset: string }> = {}
   for (const p of photos) {
-    thumbUrls[p.path] = thumb(p.path)
+    thumbs[p.path] = thumbSrcset(p.path)
   }
 
   return (
@@ -64,7 +64,7 @@ export default async function AlbumDetail({ albumId }: { albumId: string }) {
           {album.description}
         </blockquote>
       )}
-      <PhotoGallery photos={photos} thumbUrls={thumbUrls} />
+      <PhotoGallery photos={photos} thumbs={thumbs} />
     </>
   )
 }
