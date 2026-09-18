@@ -4,12 +4,14 @@ import {
   getAlbum,
   getAlbumPasswordHash,
   verifyAlbumPassword,
+  albumPwFingerprint,
 } from '@/lib/queries'
 import { isAdmin } from '@/lib/albumAccess'
 import {
   signUnlockToken,
   verifyUnlockToken,
   UNLOCK_COOKIE_NAME,
+  type UnlockEntry,
 } from '@/lib/auth'
 
 interface Ctx {
@@ -49,11 +51,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: '密码错误' }, { status: 401 })
   }
 
-  // 合并已有解锁列表，续期 30 天
+  // 合并已有解锁条目（同 id 覆盖为新指纹），续期 30 天
   const cookieHeader = req.cookies.get(UNLOCK_COOKIE_NAME)?.value
   const existing = await verifyUnlockToken(cookieHeader)
-  const albumIds = Array.from(new Set([...existing, id]))
-  const token = await signUnlockToken(albumIds)
+  const merged = new Map<string, UnlockEntry>(existing.map((e) => [e.id, e]))
+  merged.set(id, { id, pw: albumPwFingerprint(hash) })
+  const token = await signUnlockToken([...merged.values()])
 
   const res = NextResponse.json({ ok: true })
   res.cookies.set(UNLOCK_COOKIE_NAME, token, {

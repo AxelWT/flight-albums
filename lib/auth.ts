@@ -55,26 +55,37 @@ export function verifyPassword(input: string): boolean {
 const UNLOCK_COOKIE_NAME = 'fa_unlocks'
 const UNLOCK_TTL = '30d'
 
-/** 签发解锁 token（payload 为已解锁相册 id 列表） */
-export async function signUnlockToken(albumIds: string[]): Promise<string> {
-  return new SignJWT({ albums: albumIds })
+/** 解锁条目：id + 密码指纹（改密码后指纹不匹配，旧解锁自动失效） */
+export interface UnlockEntry {
+  id: string
+  pw: string
+}
+
+/** 签发解锁 token（payload 为已解锁相册条目列表） */
+export async function signUnlockToken(entries: UnlockEntry[]): Promise<string> {
+  return new SignJWT({ albums: entries })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(UNLOCK_TTL)
     .sign(getSecret())
 }
 
-/** 校验解锁 token，返回已解锁相册 id 列表（无效返回空数组） */
+/** 解析解锁 token，返回条目列表（只做 JWT 校验，密码指纹由调用方比对；无效返回空数组） */
 export async function verifyUnlockToken(
   token: string | undefined | null
-): Promise<string[]> {
+): Promise<UnlockEntry[]> {
   if (!token) return []
   try {
     const { payload } = await jwtVerify(token, getSecret())
     const albums = payload.albums
-    return Array.isArray(albums)
-      ? albums.filter((a): a is string => typeof a === 'string')
-      : []
+    if (!Array.isArray(albums)) return []
+    return albums.filter(
+      (e): e is UnlockEntry =>
+        typeof e === 'object' &&
+        e !== null &&
+        typeof (e as UnlockEntry).id === 'string' &&
+        typeof (e as UnlockEntry).pw === 'string'
+    )
   } catch {
     return []
   }

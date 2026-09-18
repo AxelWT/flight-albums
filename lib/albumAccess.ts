@@ -12,7 +12,7 @@ import {
   COOKIE_NAME,
   UNLOCK_COOKIE_NAME,
 } from './auth'
-import { getAlbum } from './queries'
+import { getAlbum, getAlbumPasswordHash, albumPwFingerprint } from './queries'
 import type { Album } from './types'
 
 /** 当前请求是否为管理员（管理后台 JWT） */
@@ -21,10 +21,19 @@ export async function isAdmin(): Promise<boolean> {
   return verifyToken(store.get(COOKIE_NAME)?.value)
 }
 
-/** 当前访客已解锁的相册 id 列表 */
+/**
+ * 当前访客仍有效的已解锁相册 id 列表。
+ * 逐条与库中密码指纹比对：相册已删除、已无密码或密码已改 → 条目失效。
+ */
 export async function getUnlockedAlbumIds(): Promise<string[]> {
   const store = await cookies()
-  return verifyUnlockToken(store.get(UNLOCK_COOKIE_NAME)?.value)
+  const entries = await verifyUnlockToken(store.get(UNLOCK_COOKIE_NAME)?.value)
+  const valid: string[] = []
+  for (const e of entries) {
+    const hash = getAlbumPasswordHash(e.id)
+    if (hash && albumPwFingerprint(hash) === e.pw) valid.push(e.id)
+  }
+  return valid
 }
 
 export type AlbumAccess =

@@ -5,7 +5,7 @@
  */
 import { getDb } from './db'
 import { normalizeCategory } from './categories'
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto'
 import type { Album, Photo, AlbumInput, PhotoInput, AlbumCategory } from './types'
 
 const now = (): string => new Date().toISOString()
@@ -37,6 +37,14 @@ export function verifyAlbumPassword(password: string, stored: string): boolean {
   const calc = scryptSync(password, salt, 64)
   const expected = Buffer.from(hash, 'hex')
   return calc.length === expected.length && timingSafeEqual(calc, expected)
+}
+
+/**
+ * 密码指纹：passwordHash 的 sha256 前 16 位 hex。
+ * 写入解锁 token，改密码/清密码后指纹变化，旧解锁自动失效。
+ */
+export function albumPwFingerprint(passwordHash: string): string {
+  return createHash('sha256').update(passwordHash).digest('hex').slice(0, 16)
 }
 
 /* ============================================================
