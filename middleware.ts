@@ -4,14 +4,18 @@
  * 运行在 Edge runtime（jose 兼容）。验证 httpOnly cookie 中的 JWT。
  * - /admin/*（除登录页）：未登录 → 重定向到 /admin/login
  * - /api/* 的非 GET 请求 + /api/upload/*：未登录 → 401
- * - 公开 GET（/api/albums、/api/photos）和 /api/auth/* 放行
+ * - 公开 GET（/api/albums、/api/photos）、/api/auth/* 和 /api/image/sign 放行
  */
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth'
 
 const PUBLIC_ADMIN = ['/admin/login']
-const PUBLIC_API = ['/api/auth/login', '/api/auth/logout']
+const PUBLIC_API = [
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/image/sign', // 访客也要看 Lightbox 大图，签名接口公开（见 route 注释）
+]
 /** 相册解锁：POST 但需要对访客开放（动态段） */
 const UNLOCK_API_RE = /^\/api\/albums\/[^/]+\/unlock$/
 
