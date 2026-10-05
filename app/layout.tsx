@@ -7,10 +7,11 @@ export const metadata: Metadata = {
 }
 
 /**
- * 暗色模式初始化脚本：在 React 挂载前根据 localStorage 决定是否加 html.dark 类，
- * 避免首屏闪屏。默认浅色（纸感主题），仅当用户主动选择暗色时才切换。
+ * 暗色模式初始化脚本：在 React 挂载前写好 html.dark 类，避免首屏闪屏。
+ * localStorage('fa-theme') 三态：'light' / 'dark' / 'system'（默认）——
+ * 'system' 跟随系统 prefers-color-scheme。
  */
-const themeScript = `try{if(localStorage.getItem('fa-theme')==='dark'){document.documentElement.classList.add('dark')}}catch(e){}`
+const themeScript = `try{var t=localStorage.getItem('fa-theme');if(t==='dark'||(t!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}`
 
 export default function RootLayout({
   children,
