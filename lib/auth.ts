@@ -2,12 +2,17 @@
  * 认证工具：单管理员密码 + JWT（jose）
  *
  * 密码与 JWT 密钥均来自环境变量（GitHub Secret 注入），不入库。
- * 登录成功后签发 7 天有效的 JWT，写入 httpOnly cookie。
+ * 登录成功后签发 2 小时有效的 JWT，写入 httpOnly cookie；
+ * middleware 在有效期过半时滑动续期（活跃使用不会过期，闲置 2 小时后需重新登录）。
  */
 import { SignJWT, jwtVerify } from 'jose'
+import type { JWTPayload } from 'jose'
 
 const COOKIE_NAME = 'fa_token'
-const TOKEN_TTL = '7d'
+/** 管理员 token 有效期：2 小时（middleware 滑动续期） */
+const TOKEN_TTL = '2h'
+/** TTL 秒数（cookie maxAge / 续期阈值换算用），与 TOKEN_TTL 保持一致 */
+export const TOKEN_TTL_SECONDS = 2 * 60 * 60
 
 function getSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET
@@ -26,12 +31,19 @@ export async function signToken(): Promise<string> {
 
 /** 验证 JWT，合法返回 true */
 export async function verifyToken(token: string | undefined | null): Promise<boolean> {
-  if (!token) return false
+  return (await verifyTokenClaims(token)) !== null
+}
+
+/** 验证 JWT 并返回 claims（含 exp，续期判定用）；无效/过期返回 null */
+export async function verifyTokenClaims(
+  token: string | undefined | null
+): Promise<JWTPayload | null> {
+  if (!token) return null
   try {
-    await jwtVerify(token, getSecret())
-    return true
+    const { payload } = await jwtVerify(token, getSecret())
+    return payload
   } catch {
-    return false
+    return null
   }
 }
 

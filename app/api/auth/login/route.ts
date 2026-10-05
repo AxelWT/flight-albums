@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { verifyPassword, signToken, COOKIE_NAME } from '@/lib/auth'
+import {
+  verifyPassword,
+  signToken,
+  COOKIE_NAME,
+  TOKEN_TTL_SECONDS,
+} from '@/lib/auth'
 
 const Body = z.object({ password: z.string().min(1) })
 
@@ -22,7 +27,7 @@ export async function POST(req: NextRequest) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 7 * 24 * 60 * 60, // 7 天
+    maxAge: TOKEN_TTL_SECONDS, // 2 小时（middleware 滑动续期）
   })
   return res
 }
