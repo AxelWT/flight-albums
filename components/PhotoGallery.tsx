@@ -10,6 +10,8 @@
  * - 布局：JS「最短列优先」分配 + flex 等宽列。每张照片放入当前最矮的列，
  *   消除 CSS columns 平衡时不可分割卡片被推到下一列而留下的整段空白；
  *   已知宽高的图片用 aspect-ratio 占位，加载前不抖动
+ * - 缩略图：纯图片卡片（无标题/日期文字），点击打开放大；照片元数据
+ *   （标题/说明/日期/地点）只在 Lightbox 大图下展示
  * - 分批加载：首批 24 张，滚动到底自动追加（每批 48 张），也可点按钮手动加载；
  *   最短列优先是在线算法，追加不影响已有照片的列归属，滚动中图片不跳列；
  *   Lightbox 翻页始终遍历整个相册，不受已加载数量限制
@@ -38,9 +40,6 @@ const MOBILE_BREAKPOINT = 720
 /** 列间距（px）：桌面 gap-5 = 20，移动端 gap-3 = 12 */
 const DESKTOP_GAP = 20
 const MOBILE_GAP = 12
-/** 卡片标题区估高（px），仅用于「最短列优先」的相对高度估算 */
-const CAPTION_HEIGHT = 52
-
 /** SSR 也会渲染 client 组件，useLayoutEffect 在服务端会告警，降级为 useEffect */
 const useIsomorphicLayoutEffect =
   typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -51,10 +50,10 @@ interface Props {
   thumbs: Record<string, { src: string; srcset: string }>
 }
 
-/** 卡片估高：图片高度（列宽 × 宽高比）+ 标题区；无尺寸数据按 1:1 估 */
+/** 卡片估高：列宽 × 宽高比（纯图卡片无文字区）；无尺寸数据按 1:1 估 */
 function estimateCardHeight(photo: Photo, columnWidth: number): number {
   const ratio = photo.width && photo.height ? photo.height / photo.width : 1
-  return columnWidth * ratio + CAPTION_HEIGHT
+  return columnWidth * ratio
 }
 
 /** 最短列优先分配：每张照片放入当前最矮的列，使各列底部尽量齐平 */
@@ -260,14 +259,6 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
                       : undefined
                   }
                 />
-                <span className="flex items-baseline justify-between gap-3 border-t border-dashed border-line-soft px-3.5 py-3 max-[720px]:px-3 max-[720px]:py-2.5">
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] max-[720px]:text-[13px]">
-                    {photo.title}
-                  </span>
-                  <span className="flex-none font-mono text-[10.5px] tracking-[0.06em] text-ink-3">
-                    {photo.date ?? ''}
-                  </span>
-                </span>
               </button>
             ))}
           </div>
