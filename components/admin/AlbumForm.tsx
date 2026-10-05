@@ -26,7 +26,6 @@ export default function AlbumForm({ album }: Props) {
   const [description, setDescription] = useState(album?.description ?? '')
   const [coverPath, setCoverPath] = useState(album?.coverPath ?? '')
   const [category, setCategory] = useState(normalizeCategory(album?.category))
-  const [sortOrder, setSortOrder] = useState(album?.sortOrder ?? 0)
   const [hidden, setHidden] = useState(album?.hidden ?? false)
   const [password, setPassword] = useState('')
   const [clearPassword, setClearPassword] = useState(false)
@@ -69,7 +68,6 @@ export default function AlbumForm({ album }: Props) {
       description: description.trim() || null,
       coverPath,
       category,
-      sortOrder,
       hidden,
       password: passwordField,
     }
@@ -84,7 +82,6 @@ export default function AlbumForm({ album }: Props) {
             description: body.description,
             coverPath: body.coverPath,
             category: body.category,
-            sortOrder: body.sortOrder,
             hidden: body.hidden,
             password: body.password,
           }),
@@ -168,16 +165,6 @@ export default function AlbumForm({ album }: Props) {
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
           placeholder="山不会走向你，但你可以走向山。"
-          className={fieldClass}
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className={labelClass}>排序（数字越小越靠前）</span>
-        <input
-          type="number"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(Number(e.target.value))}
           className={fieldClass}
         />
       </label>

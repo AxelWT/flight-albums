@@ -110,6 +110,14 @@ export function getAlbumPasswordHash(id: string): string | null {
 export function createAlbum(input: AlbumInput): Album {
   const db = getDb()
   const ts = now()
+  // 未指定排序时插到该分类最前（min - 10，步长 10 留插入余量）；分类为空则用 10
+  let sortOrder = input.sortOrder
+  if (sortOrder === undefined) {
+    const row = db
+      .prepare('SELECT MIN(sortOrder) AS m FROM albums WHERE category = ?')
+      .get(normalizeCategory(input.category)) as { m: number | null }
+    sortOrder = row.m === null ? 10 : row.m - 10
+  }
   db.prepare(
     `INSERT INTO albums (id, title, description, coverPath, category, sortOrder, hidden, passwordHash, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -119,13 +127,48 @@ export function createAlbum(input: AlbumInput): Album {
     input.description ?? null,
     input.coverPath,
     normalizeCategory(input.category),
-    input.sortOrder ?? 0,
+    sortOrder,
     input.hidden ? 1 : 0,
     input.password ? hashAlbumPassword(input.password) : null,
     ts,
     ts
   )
   return getAlbum(input.id)!
+}
+
+/**
+ * 重排某分类的相册：按 ids 顺序重写 sortOrder（10/20/30…，步长 10 留插入余量）。
+ * ids 必须与该分类现有相册 id 集合完全一致（前端过期时防误写），
+ * 不一致抛错。只重写目标分类，两分类编号互相独立。
+ */
+export function reorderAlbums(
+  category: AlbumCategory,
+  ids: string[]
+): void {
+  const db = getDb()
+  const cat = normalizeCategory(category)
+  const existing = (
+    db
+      .prepare('SELECT id FROM albums WHERE category = ?')
+      .all(cat) as { id: string }[]
+  ).map((r) => r.id)
+  const existingSet = new Set(existing)
+  const idsSet = new Set(ids)
+  if (ids.length !== existing.length || idsSet.size !== ids.length) {
+    throw new Error('相册列表已变化，请刷新后重试')
+  }
+  for (const id of ids) {
+    if (!existingSet.has(id)) {
+      throw new Error('相册列表已变化，请刷新后重试')
+    }
+  }
+  const update = db.prepare(
+    'UPDATE albums SET sortOrder = ?, updatedAt = ? WHERE id = ?'
+  )
+  const ts = now()
+  for (let i = 0; i < ids.length; i++) {
+    update.run((i + 1) * 10, ts, ids[i])
+  }
 }
 
 /** 更新相册（部分字段；password：字符串=设置，null=清除，undefined=不变） */

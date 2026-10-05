@@ -1,14 +1,20 @@
 import Link from 'next/link'
 import { listAlbums, listPhotosByAlbum } from '@/lib/queries'
 import { thumb } from '@/lib/imageCdn'
-import { CATEGORY_META, normalizeCategory } from '@/lib/categories'
+import { CATEGORY_META, NAV_CATEGORIES } from '@/lib/categories'
+import AdminAlbumList from '@/components/admin/AdminAlbumList'
 import AlbumForm from '@/components/admin/AlbumForm'
-import DeleteButton from '@/components/admin/DeleteButton'
 
 export const dynamic = 'force-dynamic'
 
 export default function AlbumsAdminPage() {
   const albums = listAlbums(undefined, true)
+
+  // 每个分类的元信息（照片数、封面签名 URL），供列表行展示
+  const counts: Record<string, number> = {}
+  for (const a of albums) {
+    counts[a.id] = listPhotosByAlbum(a.id).length
+  }
 
   return (
     <>
@@ -22,49 +28,35 @@ export default function AlbumsAdminPage() {
         </Link>
       </div>
 
-      {/* 相册列表 */}
-      {albums.length === 0 ? (
-        <p className="mb-10 border border-dashed border-line py-10 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-ink-3">
-          还没有相册，在下方新建。
-        </p>
-      ) : (
-        <div className="mb-12 divide-y divide-dashed divide-line-soft border-y border-dashed border-line">
-          {albums.map((a) => {
-            const count = listPhotosByAlbum(a.id).length
-            return (
-              <div key={a.id} className="flex items-center gap-4 py-3.5">
-                <img
-                  src={thumb(a.coverPath, 120)}
-                  alt={a.title}
-                  className="h-12 w-20 flex-none object-cover border border-line-soft"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-serif text-[15px] text-ink">{a.title}</p>
-                  <p className="font-mono text-[10px] text-ink-3">
-                    {a.id} · {CATEGORY_META[normalizeCategory(a.category)].label} · {count} 张 ·
-                    排序 {a.sortOrder}
-                    {a.hasPassword && <span className="text-sunkissed"> · 密码</span>}
-                    {a.hidden && <span className="text-terracotta"> · 隐藏</span>}
-                  </p>
-                </div>
-                <Link
-                  href={`/admin/photos/${a.id}`}
-                  className="font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3 no-underline hover:text-ink"
-                >
-                  照片
-                </Link>
-                <Link
-                  href={`/admin/albums/${a.id}`}
-                  className="font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3 no-underline hover:text-ink"
-                >
-                  编辑
-                </Link>
-                <DeleteButton apiPath={`/api/albums/${a.id}`} />
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* 按分类分节：典藏在前、拾光在后（与前台导航顺序一致）；
+          各节内拖拽把手排序，编号互相独立 */}
+      {NAV_CATEGORIES.map((category) => {
+        const section = albums.filter((a) => a.category === category)
+        return (
+          <section key={category}>
+            <h2 className="mb-4 border-b border-dashed border-line pb-2 font-mono text-[11px] uppercase tracking-[0.1em] text-ink-3">
+              {CATEGORY_META[category].label}
+              <span className="ml-2 text-ink-3/70">
+                （{section.length} 个 · 拖拽 ⠿ 排序）
+              </span>
+            </h2>
+            {section.length === 0 ? (
+              <p className="mb-12 border border-dashed border-line py-8 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-ink-3">
+                该目录还没有相册，在下方新建。
+              </p>
+            ) : (
+              <AdminAlbumList
+                albums={section.map((a) => ({
+                  ...a,
+                  count: counts[a.id],
+                  coverUrl: thumb(a.coverPath, 120),
+                  categoryLabel: CATEGORY_META[category].label,
+                }))}
+              />
+            )}
+          </section>
+        )
+      })}
 
       {/* 新建相册 */}
       <section>
