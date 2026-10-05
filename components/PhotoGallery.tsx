@@ -10,8 +10,8 @@
  * - 布局：JS「最短列优先」分配 + flex 等宽列。每张照片放入当前最矮的列，
  *   消除 CSS columns 平衡时不可分割卡片被推到下一列而留下的整段空白；
  *   已知宽高的图片用 aspect-ratio 占位，加载前不抖动
- * - 分批渲染：首批 24 张，滚动到底自动追加（每批 48 张），也可点按钮手动加载；
- *   每批为独立列容器，追加不重排已有图片（避免滚动中图片跳列换位）；
+ * - 分批加载：首批 24 张，滚动到底自动追加（每批 48 张），也可点按钮手动加载；
+ *   最短列优先是在线算法，追加不影响已有照片的列归属，滚动中图片不跳列；
  *   Lightbox 翻页始终遍历整个相册，不受已加载数量限制
  * - Lightbox：点击时按需调 /api/image/sign 获取大图签名 URL，支持 ←/→/Esc 键盘、
  *   点击背景关闭、左右大点击区翻页、右下角"下载原图"
@@ -127,17 +127,18 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
   )
 
   /**
-   * 按批次切分：首批 INITIAL_COUNT 张、后续每批 STEP 张，各自独立列容器。
-   * 每批内部用「最短列优先」分配；分块后已渲染的批次内容固定，追加新批次不会
-   * 重排已有图片（滚动中图片跳列换位）。
+   * 全局「最短列优先」分配（不分批）：
+   * 最短列优先是在线算法 —— 前 N 张的列分配只取决于前 N 张自身，
+   * 追加第 N+1 张不会改变已有照片的归属，因此滚动追加时已有图片
+   * 不会跳列换位（React 按 photo.id diff 后纯追加）。
+   * 若按批次各自分配，批次交界处会因各批列底参差出现大段垂直空隙。
    */
-  const batches: { start: number; items: Photo[] }[] = []
-  for (let start = 0; start < visibleCount; ) {
-    const size = batches.length === 0 ? INITIAL_COUNT : STEP
-    const end = Math.min(start + size, visibleCount)
-    batches.push({ start, items: photos.slice(start, end) })
-    start = end
-  }
+  const visiblePhotos = photos.slice(0, visibleCount)
+  const columns = allocateColumns(
+    visiblePhotos.map((photo, index) => ({ photo, index })),
+    layout.count,
+    layout.columnWidth
+  )
 
   const close = useCallback(() => setActiveIndex(null), [])
   const prev = useCallback(
@@ -228,64 +229,50 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
 
   return (
     <div ref={containerRef} className="my-8 font-serif text-ink">
-      {/* 缩略图瀑布流 —— 每批独立 flex 列组渲染（追加不重排已有图片） */}
-      {batches.map((batch, batchIndex) => {
-        const items = batch.items.map((photo, j) => ({
-          photo,
-          index: batch.start + j,
-        }))
-        const columns = allocateColumns(items, layout.count, layout.columnWidth)
-        return (
+      {/* 缩略图瀑布流 —— 全局最短列优先分配，单组 flex 等宽列渲染 */}
+      <div className="flex items-start gap-5 max-[720px]:gap-3">
+        {columns.map((column, columnIndex) => (
           <div
-            key={batchIndex}
-            className={batchIndex === 0 ? '' : 'mt-5 max-[720px]:mt-3'}
+            key={columnIndex}
+            className="flex w-0 flex-1 flex-col gap-5 max-[720px]:gap-3"
           >
-            <div className="flex items-start gap-5 max-[720px]:gap-3">
-              {columns.map((column, columnIndex) => (
-                <div
-                  key={columnIndex}
-                  className="flex w-0 flex-1 flex-col gap-5 max-[720px]:gap-3"
-                >
-                  {column.map(({ photo, index }) => (
-                    <button
-                      key={photo.id}
-                      type="button"
-                      className="group flex w-full flex-col overflow-hidden border border-line-soft bg-bg-soft text-left shadow-card transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover"
-                      aria-label={`查看 ${photo.title}`}
-                      onClick={() => setActiveIndex(index)}
-                    >
-                      <img
-                        src={thumbs[photo.path]?.src ?? ''}
-                        srcSet={thumbs[photo.path]?.srcset}
-                        sizes="(max-width: 480px) 48vw, (max-width: 720px) 32vw, 320px"
-                        alt={photo.title}
-                        loading="lazy"
-                        decoding="async"
-                        className="block h-auto w-full transition-transform duration-400 group-hover:scale-[1.03]"
-                        style={
-                          photo.width && photo.height
-                            ? {
-                                aspectRatio: `${photo.width} / ${photo.height}`,
-                              }
-                            : undefined
+            {column.map(({ photo, index }) => (
+              <button
+                key={photo.id}
+                type="button"
+                className="group flex w-full flex-col overflow-hidden border border-line-soft bg-bg-soft text-left shadow-card transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover"
+                aria-label={`查看 ${photo.title}`}
+                onClick={() => setActiveIndex(index)}
+              >
+                <img
+                  src={thumbs[photo.path]?.src ?? ''}
+                  srcSet={thumbs[photo.path]?.srcset}
+                  sizes="(max-width: 480px) 48vw, (max-width: 720px) 32vw, 320px"
+                  alt={photo.title}
+                  loading="lazy"
+                  decoding="async"
+                  className="block h-auto w-full transition-transform duration-400 group-hover:scale-[1.03]"
+                  style={
+                    photo.width && photo.height
+                      ? {
+                          aspectRatio: `${photo.width} / ${photo.height}`,
                         }
-                      />
-                      <span className="flex items-baseline justify-between gap-3 border-t border-dashed border-line-soft px-3.5 py-3 max-[720px]:px-3 max-[720px]:py-2.5">
-                        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] max-[720px]:text-[13px]">
-                          {photo.title}
-                        </span>
-                        <span className="flex-none font-mono text-[10.5px] tracking-[0.06em] text-ink-3">
-                          {photo.date ?? ''}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
+                      : undefined
+                  }
+                />
+                <span className="flex items-baseline justify-between gap-3 border-t border-dashed border-line-soft px-3.5 py-3 max-[720px]:px-3 max-[720px]:py-2.5">
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] max-[720px]:text-[13px]">
+                    {photo.title}
+                  </span>
+                  <span className="flex-none font-mono text-[10.5px] tracking-[0.06em] text-ink-3">
+                    {photo.date ?? ''}
+                  </span>
+                </span>
+              </button>
+            ))}
           </div>
-        )
-      })}
+        ))}
+      </div>
 
       {/* 加载更多：滚动自动触发，按钮兜底（弱网/IO 失效时） */}
       {hasMore ? (
