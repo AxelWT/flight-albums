@@ -10,6 +10,12 @@
  * 旋转显示，此处通过 exif 接口检测方向并交换宽高，保证入库的是「显示尺寸」，
  * 与上传路径 createImageBitmap（默认应用 EXIF）语义一致。
  *
+ * 网络策略（防限流，教训：直打图片访问域名曾触发 514 限频 → 403 封禁）：
+ * - CI 查询直连 COS 源站域名，不走图片访问域名（自定义/CDN 域名带频次
+ *   限制与防盗链，批量运维请求不该走它）
+ * - 全局限速 ~10 QPS；限流（429/514）与网关类错误退避重试（3s/10s）
+ * - 连续 20 张失败自动熔断中止（疑似限流/封禁时及时收手），重跑续跑
+ *
  * 特性：
  * - 幂等：只处理缺失尺寸的行，可重复执行；失败的行保持 NULL，重跑自动重试
  * - 在线安全：WAL 模式 + 逐行短事务，应用运行中可执行，无需停服
@@ -58,17 +64,64 @@ if (!secretId || !secretKey || !bucket || !region) {
   )
   process.exit(1)
 }
+// CI 查询一律直连 COS 源站：图片访问域名（自定义/CDN）带频次限制与防盗链，
+// 批量回填曾触发 514 限频 → 403 封禁；源站是 CI 服务原生入口，无此类风控
 const cosHost = `${bucket}.cos.${region}.myqcloud.com`
-// 图片访问域名（可选）：自定义源站默认带签名；CDN 加速域名须设 COS_IMAGE_HOST_SIGNED=false（不带签名）
-const imageHost = process.env.COS_IMAGE_HOST
-  ?.replace(/^https?:\/\//, '')
-  .replace(/\/+$/, '')
-const imageHostSigned = process.env.COS_IMAGE_HOST_SIGNED !== 'false'
 
 const sha1 = (data) =>
   crypto.createHash('sha1').update(data, 'utf8').digest('hex')
 const hmacSha1 = (key, data) =>
   crypto.createHmac('sha1', key).update(data, 'utf8').digest('hex')
+
+/** 并发数：与限速配合维持吞吐（单请求 200-300ms RTT，8 并发足以跑满限速窗口） */
+const CONCURRENCY = 8
+/** 全局请求起始最小间隔（ms）：约 10 QPS，对源站友好 */
+const MIN_INTERVAL_MS = 100
+/** 单请求超时（ms）：防止网络异常时单个请求挂起 */
+const REQUEST_TIMEOUT_MS = 15000
+/** 单行最大尝试次数（含首次）：限流/网络错误退避重试 */
+const MAX_ATTEMPTS = 3
+/** 连续失败熔断阈值：疑似限流/封禁时及时中止，避免加重风控 */
+const ABORT_THRESHOLD = 20
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/* ---- 全局限速器：任意两次请求起始间隔 ≥ MIN_INTERVAL_MS（JS 单线程，同步段原子） ---- */
+let nextSlot = 0
+async function pace() {
+  const now = Date.now()
+  const wait = nextSlot - now
+  nextSlot = Math.max(now, nextSlot + MIN_INTERVAL_MS)
+  if (wait > 0) await sleep(wait)
+}
+
+/** 可重试状态码：限流（429/514）与网关类瞬时错误 */
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504, 514])
+
+/**
+ * 带限速/超时/重试的 CI 查询。限流或网络错误按 3s/10s 退避重试，
+ * 重试耗尽抛 Error（该行保持 NULL，重跑本脚本续跑）。
+ */
+async function fetchCi(url) {
+  let lastErr
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (attempt > 1) await sleep(attempt === 2 ? 3000 : 10000)
+    await pace()
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+      if (RETRYABLE_STATUS.has(res.status)) {
+        lastErr = new Error(`HTTP ${res.status}`)
+        continue
+      }
+      return res
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  throw lastErr
+}
 
 /** 把 key 编码成 URL 路径（保留 / 分隔符），同 lib/cos.ts */
 function encodePath(key) {
@@ -79,17 +132,10 @@ function encodePath(key) {
 /** 生成带 CI 处理参数的查询 URL（CI 参数不参与 COS 签名，规则同 lib/cos.ts getSignedGetUrl） */
 function signedCiUrl(key, ciParam) {
   const urlPath = encodePath(key)
-  const finalHost = imageHost ?? cosHost
 
-  // CDN 加速域名（不签名）：缓存 key 稳定、命中率高
-  if (imageHost && !imageHostSigned) {
-    return `https://${finalHost}${urlPath}?${ciParam}`
-  }
-
-  // 带签名：签名 host 与实际访问域名一致（COS 按请求的 Host 验签）
   const now = Math.floor(Date.now() / 1000)
   const keyTime = `${now - 60};${now + 600}`
-  const formatString = `get\n${urlPath}\n\nhost=${finalHost}\n`
+  const formatString = `get\n${urlPath}\n\nhost=${cosHost}\n`
   const signKey = hmacSha1(secretKey, keyTime)
   const stringToSign = `sha1\n${keyTime}\n${sha1(formatString)}\n`
   const auth = new URLSearchParams({
@@ -101,7 +147,13 @@ function signedCiUrl(key, ciParam) {
     'q-url-param-list': '',
     'q-signature': hmacSha1(signKey, stringToSign),
   })
-  return `https://${finalHost}${urlPath}?${ciParam}&${auth}`
+  return `https://${cosHost}${urlPath}?${ciParam}&${auth}`
+}
+
+/** 响应错误体摘要（前 120 字符），失败原因可诊断 */
+async function errorSnippet(res) {
+  const body = (await res.text().catch(() => '')).slice(0, 120)
+  return body ? `：${body.replace(/\s+/g, ' ')}` : ''
 }
 
 /**
@@ -123,8 +175,10 @@ function parseExifOrientation(exif) {
  * EXIF 获取失败则抛错让该行保持 NULL，重跑重试。
  */
 async function fetchDisplayDimensions(key) {
-  const res = await fetch(signedCiUrl(key, 'imageInfo'))
-  if (!res.ok) throw new Error(`imageInfo HTTP ${res.status}`)
+  const res = await fetchCi(signedCiUrl(key, 'imageInfo'))
+  if (!res.ok) {
+    throw new Error(`imageInfo HTTP ${res.status}${await errorSnippet(res)}`)
+  }
   const info = await res.json()
   let width = Number(info?.width)
   let height = Number(info?.height)
@@ -140,7 +194,7 @@ async function fetchDisplayDimensions(key) {
   // 只有支持 EXIF 的格式才可能带旋转方向；PNG/GIF 等直接返回原始尺寸
   const format = String(info?.format ?? '').toUpperCase()
   if (['JPEG', 'JPG', 'WEBP', 'HEIC', 'HEIF', 'AVIF'].includes(format)) {
-    const exifRes = await fetch(signedCiUrl(key, 'exif'))
+    const exifRes = await fetchCi(signedCiUrl(key, 'exif'))
     let orientation = 0
     if (exifRes.ok) {
       orientation = parseExifOrientation(await exifRes.json().catch(() => null))
@@ -149,7 +203,9 @@ async function fetchDisplayDimensions(key) {
       // 视为无方向信息（Orientation 1）正常入库；其余错误（网络 / 鉴权）
       // 抛出让该行保持 NULL，重跑本脚本重试
       const body = await exifRes.text().catch(() => '')
-      if (!/exif/i.test(body)) throw new Error(`exif HTTP ${exifRes.status}`)
+      if (!/exif/i.test(body)) {
+        throw new Error(`exif HTTP ${exifRes.status}：${body.slice(0, 120)}`)
+      }
     }
     if (orientation >= 5 && orientation <= 8) {
       ;[width, height] = [height, width]
@@ -203,28 +259,65 @@ if (!rows.length) {
   process.exit(0)
 }
 
-console.log(`待回填 ${rows.length} 张，开始通过 COS imageInfo 获取尺寸…`)
+console.log(`待回填 ${rows.length} 张，直连 COS 源站（${cosHost}）获取尺寸…`)
 
 const update = db.prepare('UPDATE photos SET width = ?, height = ? WHERE id = ?')
 const failed = []
 let done = 0
+let processed = 0
+let cursor = 0
+let consecutiveFails = 0
+let aborted = false
 
-for (const row of rows) {
-  try {
-    const { width, height } = await fetchDisplayDimensions(row.path)
-    update.run(width, height, row.id)
-    done++
-    process.stdout.write(`\r已回填 ${done}/${rows.length}`)
-  } catch (err) {
-    failed.push({
-      path: row.path,
-      reason: err instanceof Error ? err.message : String(err),
-    })
+/**
+ * 进度输出：TTY 终端用 \r 原地刷新；非 TTY（docker exec 管道 / 重定向）时
+ * \r 无换行效果且 stdout 缓冲，改为每 100 张打一行，避免"看似卡住"。
+ */
+function reportProgress() {
+  processed++
+  if (process.stdout.isTTY) {
+    process.stdout.write(`\r已处理 ${processed}/${rows.length}`)
+  } else if (processed % 100 === 0 || processed === rows.length) {
+    console.log(`已处理 ${processed}/${rows.length}`)
   }
 }
 
+// 并发工作池：node:sqlite 的 DatabaseSync 是同步 API，JS 单线程下并发安全；
+// 连续失败达到熔断阈值时各 worker 在取下一行前退出
+async function worker() {
+  while (!aborted) {
+    const i = cursor++
+    if (i >= rows.length) return
+    const row = rows[i]
+    try {
+      const { width, height } = await fetchDisplayDimensions(row.path)
+      update.run(width, height, row.id)
+      done++
+      consecutiveFails = 0
+    } catch (err) {
+      failed.push({
+        path: row.path,
+        reason: err instanceof Error ? err.message : String(err),
+      })
+      if (++consecutiveFails >= ABORT_THRESHOLD) aborted = true
+    }
+    reportProgress()
+  }
+}
+
+await Promise.all(
+  Array.from({ length: Math.min(CONCURRENCY, rows.length) }, () => worker())
+)
+
 process.stdout.write('\n\n')
-console.log(`✓ 回填完成：成功 ${done} 张，失败 ${failed.length} 张。`)
+console.log(`✓ 回填结束：成功 ${done} 张，失败 ${failed.length} 张。`)
+
+if (aborted) {
+  console.log(
+    `⚠ 连续 ${ABORT_THRESHOLD} 张失败，已熔断中止（疑似源站限流或网络异常）。`
+  )
+  console.log('  已回填的数据已保留；等几分钟网络恢复后重跑本脚本，将自动续跑。')
+}
 
 if (failed.length) {
   console.log('\n失败明细（保持 NULL，重跑本脚本可重试）：')
