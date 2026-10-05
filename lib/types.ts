@@ -26,6 +26,10 @@ export interface Photo {
   date: string | null
   albumId: string
   location: string | null
+  /** 原始宽度（px）；存量数据未回填时为 null，画廊按 1:1 估高降级 */
+  width: number | null
+  /** 原始高度（px） */
+  height: number | null
   sortOrder: number
   createdAt: string
 }
@@ -55,5 +59,8 @@ export interface PhotoInput {
   date?: string | null
   albumId: string
   location?: string | null
+  /** 原始尺寸（px），用于画廊瀑布流排布与加载占位 */
+  width?: number | null
+  height?: number | null
   sortOrder?: number
 }

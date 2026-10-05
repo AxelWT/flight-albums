@@ -223,8 +223,8 @@ export function createPhoto(input: PhotoInput): Photo {
   const ts = now()
   const result = db
     .prepare(
-      `INSERT INTO photos (path, title, description, date, albumId, location, sortOrder, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO photos (path, title, description, date, albumId, location, width, height, sortOrder, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.path,
@@ -233,6 +233,8 @@ export function createPhoto(input: PhotoInput): Photo {
       input.date ?? null,
       input.albumId,
       input.location ?? null,
+      input.width ?? null,
+      input.height ?? null,
       input.sortOrder ?? 0,
       ts
     )

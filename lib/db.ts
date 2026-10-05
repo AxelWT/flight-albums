@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS photos (
   date        TEXT,
   albumId     TEXT NOT NULL,
   location    TEXT,
+  width       INTEGER,
+  height      INTEGER,
   sortOrder   INTEGER NOT NULL DEFAULT 0,
   createdAt   TEXT NOT NULL,
   FOREIGN KEY (albumId) REFERENCES albums(id) ON DELETE CASCADE
@@ -79,6 +81,17 @@ export function getDb(): DatabaseSync {
   }
   if (!cols.some((c) => c.name === 'passwordHash')) {
     dbInstance.exec('ALTER TABLE albums ADD COLUMN passwordHash TEXT')
+  }
+
+  // 迁移：旧库补充 photos 的 width / height 列（瀑布流排布与占位用）
+  const photoCols = dbInstance
+    .prepare('PRAGMA table_info(photos)')
+    .all() as { name: string }[]
+  if (!photoCols.some((c) => c.name === 'width')) {
+    dbInstance.exec('ALTER TABLE photos ADD COLUMN width INTEGER')
+  }
+  if (!photoCols.some((c) => c.name === 'height')) {
+    dbInstance.exec('ALTER TABLE photos ADD COLUMN height INTEGER')
   }
 
   return dbInstance

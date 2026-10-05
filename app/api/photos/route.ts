@@ -47,6 +47,8 @@ const CreateBody = z.object({
     .string()
     .regex(/^[a-z0-9][a-z0-9-]*$/, 'albumId 格式错误'),
   location: z.string().max(120).nullable().optional(),
+  width: z.number().int().positive().nullable().optional(),
+  height: z.number().int().positive().nullable().optional(),
   sortOrder: z.number().int().optional(),
 })
 

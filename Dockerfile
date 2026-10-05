@@ -26,6 +26,8 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 # start.mjs 从构建上下文复制（不在 next build 产物中）
 COPY start.mjs ./start.mjs
+# 运维脚本：存量照片尺寸回填（docker exec flight-albums node --experimental-sqlite backfill-dimensions.mjs）
+COPY --from=build /app/scripts/backfill-dimensions.mjs ./backfill-dimensions.mjs
 
 RUN addgroup -S app && adduser -S app -G app \
  && mkdir -p /app/data \

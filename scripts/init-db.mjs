@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS photos (
   date        TEXT,
   albumId     TEXT NOT NULL,
   location    TEXT,
+  width       INTEGER,
+  height      INTEGER,
   sortOrder   INTEGER NOT NULL DEFAULT 0,
   createdAt   TEXT NOT NULL,
   FOREIGN KEY (albumId) REFERENCES albums(id) ON DELETE CASCADE

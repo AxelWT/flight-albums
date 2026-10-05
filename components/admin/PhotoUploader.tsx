@@ -25,6 +25,22 @@ interface PendingPhoto {
   status: 'uploading' | 'ready' | 'saved' | 'error'
   error?: string
   thumbUrl?: string
+  width: number | null
+  height: number | null
+}
+
+/** 读取图片原始尺寸（读取失败返回 null，画廊按 1:1 估高降级） */
+async function readDimensions(
+  file: File
+): Promise<{ width: number | null; height: number | null }> {
+  try {
+    const bmp = await createImageBitmap(file)
+    const { width, height } = bmp
+    bmp.close()
+    return { width, height }
+  } catch {
+    return { width: null, height: null }
+  }
 }
 
 function today(): string {
@@ -61,16 +77,29 @@ export default function PhotoUploader({ albums }: { albums: Album[] }) {
           location: '',
           description: '',
           status: 'uploading',
+          width: null,
+          height: null,
         },
       ])
       try {
-        const key = await uploadToCos(file, `${category}/${albumId}`)
+        // 上传与读取原始尺寸并行（尺寸用于画廊瀑布流排布与加载占位）
+        const [key, dim] = await Promise.all([
+          uploadToCos(file, `${category}/${albumId}`),
+          readDimensions(file),
+        ])
         // 获取缩略图签名 URL 供预览显示
         const thumbUrl = await signedUrl(key, 'thumb')
         setItems((prev) =>
           prev.map((p) =>
             p.key === placeholderKey
-              ? { ...p, key, status: 'ready', thumbUrl }
+              ? {
+                  ...p,
+                  key,
+                  status: 'ready',
+                  thumbUrl,
+                  width: dim.width,
+                  height: dim.height,
+                }
               : p
           )
         )
@@ -110,14 +139,16 @@ export default function PhotoUploader({ albums }: { albums: Album[] }) {
       const res = await fetch('/api/photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: p.key,
-          title: p.title,
-          description: p.description || null,
-          date: p.date || null,
-          albumId,
-          location: p.location || null,
-        }),
+          body: JSON.stringify({
+            path: p.key,
+            title: p.title,
+            description: p.description || null,
+            date: p.date || null,
+            albumId,
+            location: p.location || null,
+            width: p.width,
+            height: p.height,
+          }),
       })
       if (res.ok) {
         updateItem(p.key, { status: 'saved' })

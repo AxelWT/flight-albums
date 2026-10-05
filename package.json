@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "db:init": "node --experimental-sqlite scripts/init-db.mjs"
+    "db:init": "node --experimental-sqlite scripts/init-db.mjs",
+    "db:backfill": "node --experimental-sqlite scripts/backfill-dimensions.mjs"
   },
   "dependencies": {
     "next": "^15.5.24",

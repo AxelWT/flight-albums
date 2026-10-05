@@ -7,13 +7,23 @@
  *
  * - 缩略图瀑布流：由 Server Component 预生成响应式签名 URL（thumbs），按原始宽高比渲染，
  *   srcset 按设备宽度/DPR 选档下载，省 COS 外网流量
+ * - 布局：JS「最短列优先」分配 + flex 等宽列。每张照片放入当前最矮的列，
+ *   消除 CSS columns 平衡时不可分割卡片被推到下一列而留下的整段空白；
+ *   已知宽高的图片用 aspect-ratio 占位，加载前不抖动
  * - 分批渲染：首批 24 张，滚动到底自动追加（每批 48 张），也可点按钮手动加载；
+ *   每批为独立列容器，追加不重排已有图片（避免滚动中图片跳列换位）；
  *   Lightbox 翻页始终遍历整个相册，不受已加载数量限制
  * - Lightbox：点击时按需调 /api/image/sign 获取大图签名 URL，支持 ←/→/Esc 键盘、
  *   点击背景关闭、左右大点击区翻页、右下角"下载原图"
  * - 风格复用设计令牌：纸感卡片、零圆角、虚线分隔
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import type { Photo } from '@/lib/types'
 
 /** 首批渲染数量 */
@@ -21,10 +31,49 @@ const INITIAL_COUNT = 24
 /** 每批追加数量 */
 const STEP = 48
 
+/** 目标列宽（px）：桌面 / 移动端（≤720px 容器），与原 CSS columns 规格一致 */
+const DESKTOP_COLUMN_WIDTH = 280
+const MOBILE_COLUMN_WIDTH = 160
+const MOBILE_BREAKPOINT = 720
+/** 列间距（px）：桌面 gap-5 = 20，移动端 gap-3 = 12 */
+const DESKTOP_GAP = 20
+const MOBILE_GAP = 12
+/** 卡片标题区估高（px），仅用于「最短列优先」的相对高度估算 */
+const CAPTION_HEIGHT = 52
+
+/** SSR 也会渲染 client 组件，useLayoutEffect 在服务端会告警，降级为 useEffect */
+const useIsomorphicLayoutEffect =
+  typeof window === 'undefined' ? useEffect : useLayoutEffect
+
 interface Props {
   photos: Photo[]
   /** 每张照片的响应式缩略图（src + srcset），key 为 photo.path */
   thumbs: Record<string, { src: string; srcset: string }>
+}
+
+/** 卡片估高：图片高度（列宽 × 宽高比）+ 标题区；无尺寸数据按 1:1 估 */
+function estimateCardHeight(photo: Photo, columnWidth: number): number {
+  const ratio = photo.width && photo.height ? photo.height / photo.width : 1
+  return columnWidth * ratio + CAPTION_HEIGHT
+}
+
+/** 最短列优先分配：每张照片放入当前最矮的列，使各列底部尽量齐平 */
+function allocateColumns<T extends { photo: Photo }>(
+  items: T[],
+  columnCount: number,
+  columnWidth: number
+): T[][] {
+  const columns: T[][] = Array.from({ length: columnCount }, () => [] as T[])
+  const heights: number[] = new Array(columnCount).fill(0)
+  for (const item of items) {
+    let shortest = 0
+    for (let i = 1; i < columnCount; i++) {
+      if (heights[i] < heights[shortest]) shortest = i
+    }
+    columns[shortest].push(item)
+    heights[shortest] += estimateCardHeight(item.photo, columnWidth)
+  }
+  return columns
 }
 
 export default function PhotoGallery({ photos, thumbs }: Props) {
@@ -33,7 +82,42 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
   const [rawUrl, setRawUrl] = useState<string>('')
   const [visibleCountState, setVisibleCountState] = useState(INITIAL_COUNT)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [layout, setLayout] = useState({
+    count: 3,
+    columnWidth: DESKTOP_COLUMN_WIDTH,
+  })
   const active = activeIndex === null ? null : photos[activeIndex] ?? null
+
+  // 按容器宽度动态计算列数与实际列宽（以目标列宽为中心）
+  useIsomorphicLayoutEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const compute = () => {
+      const w = el.clientWidth
+      if (!w) return
+      // 移动端判定用视口宽度，与 CSS max-[720px]（视口断点）对齐，
+      // 避免 720-768px 视口窗口内估高所用 gap 与实际渲染 gap 不一致
+      const mobile =
+        typeof window !== 'undefined' &&
+        window.innerWidth <= MOBILE_BREAKPOINT
+      const target = mobile ? MOBILE_COLUMN_WIDTH : DESKTOP_COLUMN_WIDTH
+      const gap = mobile ? MOBILE_GAP : DESKTOP_GAP
+      const count = Math.max(1, Math.floor((w + gap) / (target + gap)))
+      const columnWidth = (w - gap * (count - 1)) / count
+      // 值未变化时保持原引用：图片加载引起的高度变化也会触发 ResizeObserver，
+      // 不加守卫会为每张图多渲染一次
+      setLayout((prev) =>
+        prev.count === count && Math.abs(prev.columnWidth - columnWidth) < 0.5
+          ? prev
+          : { count, columnWidth }
+      )
+    }
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const visibleCount = Math.min(visibleCountState, photos.length)
   const hasMore = visibleCount < photos.length
@@ -43,9 +127,9 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
   )
 
   /**
-   * 按批次切分：首批 INITIAL_COUNT 张、后续每批 STEP 张，各自独立 columns 容器。
-   * CSS columns 是整列重排布局，若所有图片放同一容器，追加新批次会重排已有图片
-   * （滚动中图片跳列换位）；分块后已渲染的批次内容固定，列宽一致视觉连续。
+   * 按批次切分：首批 INITIAL_COUNT 张、后续每批 STEP 张，各自独立列容器。
+   * 每批内部用「最短列优先」分配；分块后已渲染的批次内容固定，追加新批次不会
+   * 重排已有图片（滚动中图片跳列换位）。
    */
   const batches: { start: number; items: Photo[] }[] = []
   for (let start = 0; start < visibleCount; ) {
@@ -143,50 +227,69 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
   }
 
   return (
-    <div className="my-8 font-serif text-ink">
-      {/* 缩略图瀑布流 —— 按批次独立 columns 块渲染（追加不重排已有图片） */}
-      {batches.map((batch, batchIndex) => (
-        <div
-          key={batchIndex}
-          className="columns-[280px] gap-5 max-[720px]:columns-[160px] max-[720px]:gap-3"
-        >
-          {batch.items.map((photo, j) => {
-            const i = batch.start + j
-            return (
-              <button
-                key={photo.id}
-                type="button"
-                className="group mb-5 flex w-full flex-col overflow-hidden border border-line-soft bg-bg-soft text-left shadow-card transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover max-[720px]:mb-3"
-                style={{ breakInside: 'avoid' }}
-                aria-label={`查看 ${photo.title}`}
-                onClick={() => setActiveIndex(i)}
-              >
-                <img
-                  src={thumbs[photo.path]?.src ?? ''}
-                  srcSet={thumbs[photo.path]?.srcset}
-                  sizes="(max-width: 720px) 160px, 320px"
-                  alt={photo.title}
-                  loading="lazy"
-                  decoding="async"
-                  className="block h-auto w-full transition-transform duration-400 group-hover:scale-[1.03]"
-                />
-                <span className="flex items-baseline justify-between gap-3 border-t border-dashed border-line-soft px-3.5 py-3 max-[720px]:px-3 max-[720px]:py-2.5">
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] max-[720px]:text-[13px]">
-                    {photo.title}
-                  </span>
-                  <span className="flex-none font-mono text-[10.5px] tracking-[0.06em] text-ink-3">
-                    {photo.date ?? ''}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      ))}
+    <div ref={containerRef} className="my-8 font-serif text-ink">
+      {/* 缩略图瀑布流 —— 每批独立 flex 列组渲染（追加不重排已有图片） */}
+      {batches.map((batch, batchIndex) => {
+        const items = batch.items.map((photo, j) => ({
+          photo,
+          index: batch.start + j,
+        }))
+        const columns = allocateColumns(items, layout.count, layout.columnWidth)
+        return (
+          <div
+            key={batchIndex}
+            className={batchIndex === 0 ? '' : 'mt-5 max-[720px]:mt-3'}
+          >
+            <div className="flex items-start gap-5 max-[720px]:gap-3">
+              {columns.map((column, columnIndex) => (
+                <div
+                  key={columnIndex}
+                  className="flex w-0 flex-1 flex-col gap-5 max-[720px]:gap-3"
+                >
+                  {column.map(({ photo, index }) => (
+                    <button
+                      key={photo.id}
+                      type="button"
+                      className="group flex w-full flex-col overflow-hidden border border-line-soft bg-bg-soft text-left shadow-card transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-line hover:shadow-card-hover"
+                      aria-label={`查看 ${photo.title}`}
+                      onClick={() => setActiveIndex(index)}
+                    >
+                      <img
+                        src={thumbs[photo.path]?.src ?? ''}
+                        srcSet={thumbs[photo.path]?.srcset}
+                        sizes="(max-width: 480px) 48vw, (max-width: 720px) 32vw, 320px"
+                        alt={photo.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="block h-auto w-full transition-transform duration-400 group-hover:scale-[1.03]"
+                        style={
+                          photo.width && photo.height
+                            ? {
+                                aspectRatio: `${photo.width} / ${photo.height}`,
+                              }
+                            : undefined
+                        }
+                      />
+                      <span className="flex items-baseline justify-between gap-3 border-t border-dashed border-line-soft px-3.5 py-3 max-[720px]:px-3 max-[720px]:py-2.5">
+                        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] max-[720px]:text-[13px]">
+                          {photo.title}
+                        </span>
+                        <span className="flex-none font-mono text-[10.5px] tracking-[0.06em] text-ink-3">
+                          {photo.date ?? ''}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
 
       {/* 加载更多：滚动自动触发，按钮兜底（弱网/IO 失效时） */}
       {hasMore ? (
-        <div className="mt-2 flex flex-col items-center gap-3">
+        <div className="mt-5 flex flex-col items-center gap-3 max-[720px]:mt-3">
           <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
           <button
             type="button"
