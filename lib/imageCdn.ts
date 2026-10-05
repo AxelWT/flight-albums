@@ -60,9 +60,18 @@ export function large(path: string, width = 1920): string {
 }
 
 /**
- * 原图：下载用，不带任何处理参数，只签名。
+ * 原图：下载用，不带任何处理参数。
+ * 通过 response-content-disposition 让 COS 返回 attachment 响应头，
+ * 浏览器收到后强制下载（跨域时 HTML download 属性无效，靠响应头驱动）。
  * 仅在服务端调用。
  */
 export function raw(path: string): string {
-  return getSignedGetUrl(path)
+  // 下载文件名 = COS key 最后一段（makeKey 生成，纯 ASCII）
+  const name =
+    decodeURIComponent(path.split('/').pop() || '').replace(/["\\\r\n]/g, '') ||
+    'photo.jpg'
+  const disposition = `attachment; filename="${name}"`
+  return getSignedGetUrl(path, undefined, 3600, {
+    'response-content-disposition': encodeURIComponent(disposition),
+  })
 }

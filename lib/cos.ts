@@ -111,14 +111,27 @@ function signRequest(
  * （COS 验签时把它们归到 path 而非 query 参数），只拼到最终 URL 的 query 部分。
  *
  * expireSeconds 内有效（默认 1 小时）。
+ *
+ * signedQuery: 需参与 COS 签名的额外 query 参数（value 须已 UrlEncode），如
+ * `response-content-disposition`（COS 会在响应头原样返回，可强制浏览器下载）。
+ * 签名规则：参数按 key 字典序排列、value 用 UrlEncode 结果（不转小写）。
  */
 export function getSignedGetUrl(
   key: string,
   ciParams?: string,
-  expireSeconds = 3600
+  expireSeconds = 3600,
+  signedQuery?: Record<string, string>
 ): string {
   const { host, imageHost, imageHostSigned } = getConfig()
   const urlPath = encodePath(key)
+
+  // 额外签名参数串（与 signRequest 内部同样的排序规则）
+  const extraStr = signedQuery
+    ? Object.keys(signedQuery)
+        .sort()
+        .map((k) => `${k}=${signedQuery[k]}`)
+        .join('&')
+    : ''
 
   // 配置了图片域名时走它，否则走 COS 源站
   const finalHost = imageHost ?? host
@@ -129,15 +142,15 @@ export function getSignedGetUrl(
   // 2. 签名含时间戳、每次生成都不同，会让 CDN 缓存完全失效；
   //    不签名则缓存 key 稳定（路径 + CI 参数），命中率最高
   if (imageHost && !imageHostSigned) {
-    return ciParams
-      ? `https://${finalHost}${urlPath}?${ciParams}`
-      : `https://${finalHost}${urlPath}`
+    // 额外参数（如 response-content-disposition）经 CDN 透传回源生效
+    const query = [extraStr, ciParams].filter(Boolean).join('&')
+    return query ? `https://${finalHost}${urlPath}?${query}` : `https://${finalHost}${urlPath}`
   }
 
   // 带签名：签名 host 必须与实际访问域名一致（COS 按请求的 Host 验签）
-  const signQuery = signRequest('get', urlPath, {}, expireSeconds, imageHost)
-  // 最终 URL：CI 参数 + 签名参数。CI 参数放前面。
-  const query = ciParams ? `${ciParams}&${signQuery}` : signQuery
+  const signQuery = signRequest('get', urlPath, signedQuery ?? {}, expireSeconds, imageHost)
+  // 最终 URL：额外签名参数 + CI 参数 + 签名参数
+  const query = [extraStr, ciParams, signQuery].filter(Boolean).join('&')
   return `https://${finalHost}${urlPath}?${query}`
 }
 
