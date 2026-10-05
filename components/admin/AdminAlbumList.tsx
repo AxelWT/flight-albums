@@ -20,30 +20,40 @@ interface Props {
 
 export default function AdminAlbumList({ albums }: Props) {
   const router = useRouter()
-  const [order, setOrder] = useState(albums.map((a) => a.id))
+  // 服务端顺序（成员或顺序变化时渲染期同步到 order：router.refresh 保留
+  // 客户端 state，新建/删除相册后若不同步，列表会缺失/残留条目）
+  const serverOrder = albums.map((a) => a.id)
+  const serverKey = serverOrder.join('|')
+  const [order, setOrder] = useState(serverOrder)
+  const [syncedKey, setSyncedKey] = useState(serverKey)
+  if (serverKey !== syncedKey) {
+    setSyncedKey(serverKey)
+    setOrder(serverOrder)
+  }
   const byId = new Map(albums.map((a) => [a.id, a]))
   const [dragId, setDragId] = useState<string | null>(null)
+  /** 落点锚点：插到某行之前；null = 追加到列表末尾 */
   const [overPosition, setOverPosition] = useState<{
-    beforeId: string
+    beforeId: string | null
   } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const listRef = useRef<HTMLDivElement | null>(null)
+  const lastId = order.length ? order[order.length - 1] : null
 
-  /** 计算落点：目标行上/下半区 → 插到目标行之前/之后 */
-  function computeInsertId(e: React.DragEvent, rowId: string): string {
+  /**
+   * 计算落点锚点：目标行上/下半区 → 插到目标行之前/之后。
+   * 目标行是最后一行且落在下半区 → null（追加到末尾）。
+   */
+  function computeInsertId(e: React.DragEvent, rowId: string): string | null {
     const row = listRef.current?.querySelector<HTMLElement>(
       `[data-album-id="${rowId}"]`
     )
     if (!row) return rowId
     const rect = row.getBoundingClientRect()
-    return e.clientY < rect.top + rect.height / 2 ? rowId : nextIdAfter(rowId)
-  }
-
-  /** 顺序中某 id 的下一个 id；已是最后一个则返回自身（插到末尾语义） */
-  function nextIdAfter(id: string): string {
-    const i = order.indexOf(id)
-    return i >= 0 && i < order.length - 1 ? order[i + 1] : id
+    if (e.clientY < rect.top + rect.height / 2) return rowId
+    const i = order.indexOf(rowId)
+    return i >= 0 && i < order.length - 1 ? order[i + 1] : null
   }
 
   async function saveReorder(nextOrder: string[]) {
@@ -71,19 +81,25 @@ export default function AdminAlbumList({ albums }: Props) {
     }
   }
 
-  /** 拖拽落定：从原位移除，插到计算出的落点之前 */
+  /** 拖拽落定：从原位移除，插到落点锚点之前（null 锚点 = 追加到末尾） */
   function onDrop(e: React.DragEvent) {
     e.preventDefault()
     const from = dragId
-    const insertBefore = overPosition?.beforeId ?? null
+    const target = overPosition
     setDragId(null)
     setOverPosition(null)
-    if (!from || !insertBefore) return
+    if (!from || !target) return
+    const insertBefore = target.beforeId
     if (from === insertBefore) return
     const next = order.filter((id) => id !== from)
-    const insertAt = next.indexOf(insertBefore)
-    next.splice(insertAt === -1 ? next.length : insertAt, 0, from)
-    // 顺序无变化（相邻前后落回原位）则不请求
+    const insertAt =
+      insertBefore === null
+        ? next.length
+        : next.indexOf(insertBefore) === -1
+          ? next.length
+          : next.indexOf(insertBefore)
+    next.splice(insertAt, 0, from)
+    // 顺序无变化（落回原位）则不请求
     if (next.join('|') === order.join('|')) return
     saveReorder(next)
   }
@@ -128,9 +144,18 @@ export default function AdminAlbumList({ albums }: Props) {
                 prev?.beforeId === beforeId ? prev : { beforeId }
               )
             }}
-            className={`flex items-center gap-4 py-3.5 ${
-              dragId === id ? 'opacity-40' : ''
-            } ${overPosition?.beforeId === id ? 'border-t-2 border-t-accent' : 'border-t-2 border-t-transparent'}`}
+            className={`flex items-center gap-4 py-3.5 border-t-2 ${
+              dragId === id ? 'opacity-40 ' : ''
+            }${
+              overPosition?.beforeId === id
+                ? 'border-t-accent'
+                : 'border-t-transparent'
+            } ${
+              // 末尾落点（beforeId=null）：最后一行显示底线指示
+              overPosition?.beforeId === null && id === lastId
+                ? 'border-b-2 border-b-accent'
+                : ''
+            }`}
             style={{ cursor: saving ? 'wait' : 'default' }}
           >
             <span
