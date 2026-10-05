@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadToCos } from '@/lib/upload'
 import SignedImg from '@/components/SignedImg'
+import Dropdown from '@/components/admin/Dropdown'
 import { NAV_CATEGORIES, CATEGORY_META, normalizeCategory } from '@/lib/categories'
 import type { Album } from '@/lib/types'
 
@@ -134,20 +135,17 @@ export default function AlbumForm({ album }: Props) {
         </label>
       )}
 
-      <label className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5">
         <span className={labelClass}>目录</span>
-        <select
+        <Dropdown
           value={category}
-          onChange={(e) => setCategory(normalizeCategory(e.target.value))}
-          className={fieldClass}
-        >
-          {NAV_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_META[c].label}目录
-            </option>
-          ))}
-        </select>
-      </label>
+          onChange={(v) => setCategory(normalizeCategory(v))}
+          options={NAV_CATEGORIES.map((c) => ({
+            value: c,
+            label: `${CATEGORY_META[c].label}目录`,
+          }))}
+        />
+      </div>
 
       <label className="flex flex-col gap-1.5">
         <span className={labelClass}>相册名</span>

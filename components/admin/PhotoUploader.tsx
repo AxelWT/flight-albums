@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadToCos } from '@/lib/upload'
 import { signedUrl } from '@/lib/clientImage'
+import Dropdown from '@/components/admin/Dropdown'
 import { CATEGORY_META, NAV_CATEGORIES, normalizeCategory } from '@/lib/categories'
 import type { Album } from '@/lib/types'
 
@@ -175,38 +176,31 @@ export default function PhotoUploader({ albums }: { albums: Album[] }) {
     <div className="flex flex-col gap-6">
       {/* 相册选择 + 拖拽区 */}
       <div className="flex flex-wrap items-end gap-4">
-        <label className="flex w-full max-w-md flex-col gap-1.5">
+        <div className="flex w-full max-w-md flex-col gap-1.5">
           <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3">
             目标相册
           </span>
-          {/* optgroup 按目录分组；标题去重前不显示 id，避免下拉框被撑得过宽 */}
-          <select
+          {/* 按目录分组（group 字段）；标题重名时才显示 id，避免列表过宽 */}
+          <Dropdown
+            className="w-full"
             value={albumId}
-            onChange={(e) => setAlbumId(e.target.value)}
-            className="w-full border border-line bg-bg px-3 py-2 font-sans text-sm text-ink outline-none focus:border-accent"
-          >
-            {NAV_CATEGORIES.map((c) => {
+            onChange={setAlbumId}
+            options={NAV_CATEGORIES.flatMap((c) => {
               const group = albums.filter(
                 (a) => normalizeCategory(a.category) === c
               )
-              if (!group.length) return null
-              return (
-                <optgroup key={c} label={CATEGORY_META[c].label}>
-                  {group.map((a) => {
-                    const duplicateTitle =
-                      group.filter((x) => x.title === a.title).length > 1
-                    return (
-                      <option key={a.id} value={a.id}>
-                        {a.title}
-                        {duplicateTitle ? ` (${a.id})` : ''}
-                      </option>
-                    )
-                  })}
-                </optgroup>
-              )
+              return group.map((a) => ({
+                value: a.id,
+                label:
+                  a.title +
+                  (group.filter((x) => x.title === a.title).length > 1
+                    ? ` (${a.id})`
+                    : ''),
+                group: CATEGORY_META[c].label,
+              }))
             })}
-          </select>
-        </label>
+          />
+        </div>
       </div>
 
       <div
