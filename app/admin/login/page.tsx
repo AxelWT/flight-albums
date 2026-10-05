@@ -53,6 +53,7 @@ export default function AdminLoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               autoFocus
               required
               className="border border-line bg-bg px-3 py-2 font-sans text-sm text-ink outline-none focus:border-accent"

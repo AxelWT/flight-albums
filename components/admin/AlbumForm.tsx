@@ -128,6 +128,7 @@ export default function AlbumForm({ album }: Props) {
             value={id}
             onChange={(e) => setId(e.target.value)}
             placeholder="mountains"
+            autoComplete="off"
             className={fieldClass}
           />
         </label>
@@ -154,6 +155,7 @@ export default function AlbumForm({ album }: Props) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="山川"
+          autoComplete="off"
           className={fieldClass}
         />
       </label>
@@ -193,6 +195,7 @@ export default function AlbumForm({ album }: Props) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={clearPassword}
+          autoComplete="new-password"
           placeholder={
             isEdit && album?.hasPassword
               ? '留空保持不变'

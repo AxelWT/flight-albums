@@ -57,6 +57,7 @@ export default function AlbumLock({ albumId }: { albumId: string }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="相册密码"
+          autoComplete="off"
           autoFocus
           className="mt-6 w-full border border-line bg-bg px-3 py-2.5 text-center text-sm text-ink outline-none focus:border-accent"
         />
