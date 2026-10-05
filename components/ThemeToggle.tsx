@@ -19,7 +19,7 @@ const ORDER: Mode[] = ['light', 'dark', 'system']
 const LABEL: Record<Mode, string> = {
   light: '亮色',
   dark: '暗色',
-  system: '跟随系统',
+  system: '自动',
 }
 
 /** 按模式应用 html.dark（返回是否为暗色） */
