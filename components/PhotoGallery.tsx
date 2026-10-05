@@ -16,7 +16,7 @@
  *   最短列优先是在线算法，追加不影响已有照片的列归属，滚动中图片不跳列；
  *   Lightbox 翻页始终遍历整个相册，不受已加载数量限制
  * - Lightbox：点击时按需调 /api/image/sign 获取大图签名 URL，支持 ←/→/Esc 键盘、
- *   点击背景关闭、左右大点击区翻页、右下角"下载原图"
+ *   点击背景关闭、左右大点击区翻页（移动端为触摸滑动翻页）、右下角"下载原图"
  * - 风格复用设计令牌：纸感卡片、零圆角、虚线分隔
  */
 import {
@@ -152,6 +152,43 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
       setActiveIndex((i) => (i === null ? i : (i + 1) % photos.length)),
     [photos.length]
   )
+
+  /**
+   * 触摸滑动翻页（移动端 Lightbox）：水平滑动超过阈值且明显水平时翻页。
+   * 竖向分量过大（>1/2 水平位移）视为误触/滚动手势，不翻页。
+   */
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  /** 刚滑动翻页标记：吞掉滑动结束后的 click（防误触"点击关闭"） */
+  const justSwiped = useRef(false)
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0]
+    touchStart.current = { x: t.clientX, y: t.clientY }
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    const start = touchStart.current
+    touchStart.current = null
+    if (!start || e.changedTouches.length !== 1) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 2) {
+      justSwiped.current = true
+      // click 在 touchend 后立即派发，超时重置防吞掉后续正常点击
+      setTimeout(() => {
+        justSwiped.current = false
+      }, 300)
+      if (dx < 0) next()
+      else prev()
+    }
+  }
+
+  /** 带滑动保护的关闭（滑动翻页结束后的 click 不触发关闭） */
+  const guardedClose = useCallback(() => {
+    if (justSwiped.current) return
+    close()
+  }, [close])
 
   // 打开 Lightbox 时，按需获取当前照片的大图 + 原图签名 URL
   useEffect(() => {
@@ -292,7 +329,9 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
       {active && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(10,8,6,0.92)] p-6 backdrop-blur-[4px] max-[720px]:p-3"
-          onClick={close}
+          onClick={guardedClose}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
         >
           {/* 左翻页大点击区 */}
           <button
@@ -310,7 +349,7 @@ export default function PhotoGallery({ photos, thumbs }: Props) {
           {/* 大图 + 信息 */}
           <figure
             className="relative flex max-h-full max-w-full flex-col items-center gap-4"
-            onClick={close}
+            onClick={guardedClose}
           >
             {largeUrl ? (
               <img
