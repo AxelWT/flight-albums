@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: '关于 — Flight Albums',
-  description: '关于我 — 一个喜欢拍照、运动、看闲书的人',
+  description: '关于我 — 一个喜欢摄影和运动、热爱生活的人',
 }
 
 const sectionLabel =
@@ -28,7 +28,7 @@ export default async function AboutPage() {
             王腾飞
           </h1>
           <p className="mt-1.5 font-serif text-[15px] text-ink-2">
-            一个喜欢拍照、运动、看闲书的人
+            一个喜欢摄影和运动、热爱生活的人
           </p>
         </div>
       </div>
@@ -38,6 +38,7 @@ export default async function AboutPage() {
         <h2 className={sectionLabel}>摄影</h2>
         <p>
           喜欢扫街、拍风景，技术还在入门阶段，但每次拍到喜欢的照片都会开心一整天。
+          <br />
           这里就是把那些瞬间收起来的地方——按相册归类，配上一点当时的感受，像一本可以翻回去的视觉日记。
         </p>
         <p className="mt-4">
